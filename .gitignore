@@ -1,0 +1,29 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+eslint/
+
+# Runtime data
+.vscode-test/
+.vscode-test.mjs
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# TypeScript output (esbuild handles bundling into dist or out)
+/out
+/dist
+
+# VS Code specific
+.vscode/
+
+# Extension Packaging Output
+*.vsix
+
+# Operating System Files
+.DS_Store
+Thumbs.db

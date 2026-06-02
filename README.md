@@ -1,71 +1,30 @@
-# planist-vscode README
+# planist-vscode
 
-This is the README for your extension "planist-vscode". After writing up a brief description, we recommend including the following sections.
+A VS Code extension for tree-shaped flow management with a text-first `.flow` DSL.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- Define one entity per file with plain text.
+- Use `-> TargetEntity` references to jump to definitions with Ctrl+Click.
+- Automatically create a missing target file when jumping to a new entity.
+- Open a live flow graph preview from the editor title button.
+- Render the graph with Cytoscape.js and Dagre for automatic layered layout.
+- Double-click a node in the preview to open its source file.
 
-For example if there is an image subfolder under your extension project workspace:
+## File format
 
-\!\[feature X\]\(images/feature-x.png\)
+```text
+entity OrderSystem
+-> PaymentService
+-> InventoryService
+```
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## Usage
 
-## Requirements
+- Save files with the `.flow` extension.
+- Click the preview button in the editor title bar to open the graph.
+- Double-click a node in the graph to jump back to its file.
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## Packaging
 
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Run `npm run package:vsix` to build a local VSIX package.

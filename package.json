@@ -3,34 +3,85 @@
   "displayName": "planist_vscode",
   "description": "專案計和筆記管理",
   "version": "0.0.1",
+  "publisher": "chiayu",
   "engines": {
     "vscode": "^1.120.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "flowlang",
+        "aliases": [
+          "Flow Language",
+          "flowlang"
+        ],
+        "extensions": [
+          ".plan",
+          ".flow"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
     "commands": [
       {
         "command": "planist-vscode.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "planist-vscode.previewFlow",
+        "title": "Preview Flow",
+        "category": "Flow Manager"
+      },
+      {
+        "command": "planist-vscode.switchViewMode",
+        "title": "Switch Flow View Mode",
+        "category": "Flow Manager"
+      },
+      {
+        "command": "planist.createFlow",
+        "title": "Create Flow",
+        "category": "Planist"
+      },
+      {
+        "command": "planist.configureAppearance",
+        "title": "Configure Appearance",
+        "category": "Planist"
       }
-    ]
+    ],
+    "keybindings": [
+      {
+        "command": "planist-vscode.switchViewMode",
+        "key": "ctrl+shift+m",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "when": "resourceExtname == .plan || resourceExtname == .flow",
+          "command": "planist-vscode.previewFlow",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
-    "vscode:prepublish": "yarn run package",
-    "compile": "yarn run check-types && yarn run lint && node esbuild.js",
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package": "yarn run check-types && yarn run lint && node esbuild.js --production",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "yarn run compile-tests && yarn run compile && yarn run lint",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
+    "package:vsix": "vsce package --no-dependencies --no-yarn",
     "test": "vscode-test"
   },
   "devDependencies": {
@@ -42,6 +93,7 @@
     "esbuild": "^0.27.3",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.9.3",
+    "@vscode/vsce": "^3.6.2",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2"
   }
