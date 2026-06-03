@@ -1,65 +1,37 @@
+/**
+ * ============================================================================
+ * 模組定位：Planist 指令互動控制器 (src/commands/commandController.ts)
+ * 
+ * 此檔案負責處理所有透過 VS Code Command Palette（或選單快捷按鈕）觸發的交互指令。
+ * 包括檔案建立精靈（QuickPick / InputBox 彈出引導窗）與外觀調色盤樣式設定精靈。
+ * 
+ * 重要類別與函數：
+ * - CommandController: 靜態指令操作集成控制器。
+ * - buildDefaultTemplatePreview: 獲取指定類型 DSL 範本內容。
+ * 
+ * 擴充與修改指引：
+ * 1. 若要增加新的操作指令（如導出為 SVG 等），可在 `CommandController` 內增加靜態方法，
+ *    並在入口 `extension.ts` 內註冊該命令。
+ * 2. 若要增加可供創建的類別（例如新增 `class` 或 `interface` 以外的新實體類型選項），
+ *    可直接擴充 `declarationKinds` 陣列。
+ * ============================================================================
+ */
+
 import * as vscode from 'vscode';
-import { buildFlowTemplate, createModuleStructure, type FlowDeclarationKind } from './workspaceManager';
+import { LogManager } from '../config/logger';
+
 import {
 	normalizePlanistConfig,
 	loadPlanistConfig,
 	writePlanistConfig,
 	type PlanistConfig,
 	type PlanistBackgroundPattern,
-} from './planistConfig';
-
-const declarationKinds: Array<{ label: string; value: FlowDeclarationKind; description: string }> = [
-	{ label: 'class', value: 'class', description: '標準類別流程' },
-	{ label: 'abstract', value: 'abstract', description: '抽象類別流程' },
-	{ label: 'interface', value: 'interface', description: '介面定義' },
-	{ label: 'record', value: 'record', description: '記錄型結構' },
-	{ label: 'enum', value: 'enum', description: '列舉型結構' },
-	{ label: 'text', value: 'text', description: '純文字流程' },
-];
+} from '../config/planistConfig';
 
 export class CommandController {
-	public static async handleCreateFlow(): Promise<void> {
-		const moduleName = await vscode.window.showInputBox({
-			prompt: '請輸入功能模組名稱',
-			placeHolder: 'OrderModule',
-		});
-		if (!moduleName) {
-			return;
-		}
-
-		const entryName = await vscode.window.showInputBox({
-			prompt: '請輸入入口文件名稱',
-			placeHolder: 'OrderController',
-		});
-		if (!entryName) {
-			return;
-		}
-
-		const selectedKind = await vscode.window.showQuickPick(declarationKinds, {
-			placeHolder: '請選擇流程文件開頭類型',
-		});
-		if (!selectedKind) {
-			return;
-		}
-
-		try {
-			const fileUri = await createModuleStructure({
-				moduleName,
-				entryName,
-				declarationKind: selectedKind.value,
-			});
-
-			const document = await vscode.workspace.openTextDocument(fileUri);
-			await vscode.window.showTextDocument(document, {
-				preview: false,
-			});
-			vscode.window.showInformationMessage(`成功建立 ${entryName}.plan (${selectedKind.label})`);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : '未知錯誤';
-			vscode.window.showErrorMessage(`建立失敗: ${message}`);
-		}
-	}
-
+	/**
+	 * 開啟互動式引導窗以逐項設定外觀樣式，配置完成後寫入 config.json
+	 */
 	public static async handleConfigureAppearance(): Promise<void> {
 		const currentConfig = await loadPlanistConfig();
 		const backgroundColor = await promptInput('背景顏色 (rgb)', currentConfig.appearance.backgroundColor);
@@ -134,9 +106,7 @@ export class CommandController {
 	}
 }
 
-export function buildDefaultTemplatePreview(entryName: string, declarationKind: FlowDeclarationKind): string {
-	return buildFlowTemplate(entryName, declarationKind);
-}
+
 
 async function promptInput(label: string, defaultValue: string): Promise<string | undefined> {
 	return vscode.window.showInputBox({

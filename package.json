@@ -1,7 +1,7 @@
 {
   "name": "planist-vscode",
-  "displayName": "planist_vscode",
-  "description": "專案計和筆記管理",
+  "displayName": "Planist",
+  "description": "專案計畫和筆記管理",
   "version": "0.0.1",
   "publisher": "chiayu",
   "engines": {
@@ -20,17 +20,17 @@
           "flowlang"
         ],
         "extensions": [
-          ".plan",
+          ".pln",
           ".flow"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./media/icon-light.png",
+          "dark": "./media/icon-dark.png"
+        }
       }
     ],
     "commands": [
-      {
-        "command": "planist-vscode.helloWorld",
-        "title": "Hello World"
-      },
       {
         "command": "planist-vscode.previewFlow",
         "title": "Preview Flow",
@@ -40,11 +40,6 @@
         "command": "planist-vscode.switchViewMode",
         "title": "Switch Flow View Mode",
         "category": "Flow Manager"
-      },
-      {
-        "command": "planist.createFlow",
-        "title": "Create Flow",
-        "category": "Planist"
       },
       {
         "command": "planist.configureAppearance",
@@ -62,12 +57,203 @@
     "menus": {
       "editor/title": [
         {
-          "when": "resourceExtname == .plan || resourceExtname == .flow",
+          "when": "resourceExtname == .pln || resourceExtname == .flow",
           "command": "planist-vscode.previewFlow",
           "group": "navigation"
         }
       ]
-    }
+    },
+    "configuration": [
+      {
+        "title": "一般",
+        "properties": {
+          "planist.general.enableLinter": {
+            "type": "boolean",
+            "default": true,
+            "description": "啟用即時語法與關聯性錯誤檢查 (Linter)"
+          },
+          "planist.general.themeMode": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark",
+              "system"
+            ],
+            "default": "system",
+            "description": "畫布與高亮的主題模式：淺色模式 (light)、深色模式 (dark)、跟隨系統 (system)"
+          }
+        }
+      },
+      {
+        "title": "關鍵字",
+        "properties": {
+          "planist.theme.keywords.class": {
+            "type": "string",
+            "default": "rgba(75, 192, 192, 1.0)",
+            "description": "class 關鍵字之文字與畫布方塊色彩 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.keywords.abstract": {
+            "type": "string",
+            "default": "rgba(79, 70, 229, 1.0)",
+            "description": "abstract 關鍵字之文字與畫布方塊色彩 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.keywords.interface": {
+            "type": "string",
+            "default": "rgba(153, 102, 255, 1.0)",
+            "description": "interface 關鍵字之文字與畫布方塊色彩 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.keywords.record": {
+            "type": "string",
+            "default": "rgba(217, 119, 6, 1.0)",
+            "description": "record 關鍵字之文字與畫布方塊色彩 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.keywords.enum": {
+            "type": "string",
+            "default": "rgba(219, 39, 119, 1.0)",
+            "description": "enum 關鍵字之文字與畫布方塊色彩 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.keywords.text": {
+            "type": "string",
+            "default": "rgba(107, 114, 128, 1.0)",
+            "description": "text 關鍵字之文字與畫布方塊色彩 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.keywords.bind": {
+            "type": "string",
+            "default": "rgba(75, 192, 192, 1.0)",
+            "description": "bind 關鍵字之文字與畫布方塊色彩 (支援 RGB/RGBA/Hex)"
+          }
+        }
+      },
+      {
+        "title": "主題 Token 著色",
+        "properties": {
+          "planist.theme.tokens.keyword": {
+            "type": "string",
+            "default": "rgba(86, 156, 214, 1.0)",
+            "description": "關鍵字與修飾詞顏色 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.tokens.name": {
+            "type": "string",
+            "default": "rgba(156, 220, 254, 1.0)",
+            "description": "名稱與識別字顏色 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.tokens.type": {
+            "type": "string",
+            "default": "rgba(78, 201, 176, 1.0)",
+            "description": "型別與類別類型顏色 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.tokens.comment": {
+            "type": "string",
+            "default": "rgba(106, 153, 85, 1.0)",
+            "description": "註解文字與符號顏色 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.tokens.arrow": {
+            "type": "string",
+            "default": "rgba(197, 134, 192, 1.0)",
+            "description": "關係箭頭 -> 顏色 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.tokens.config": {
+            "type": "string",
+            "default": "rgba(220, 220, 170, 1.0)",
+            "description": "全域設定（如 bind: 等）屬性鍵顏色 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.tokens.string": {
+            "type": "string",
+            "default": "rgba(206, 145, 120, 1.0)",
+            "description": "字串文字顏色 (支援 RGB/RGBA/Hex)"
+          },
+          "planist.theme.tokens.number": {
+            "type": "string",
+            "default": "rgba(181, 206, 168, 1.0)",
+            "description": "數字常值顏色 (支援 RGB/RGBA/Hex)"
+          }
+        }
+      },
+      {
+        "title": "流程圖",
+        "properties": {
+          "planist.board.background": {
+            "type": "string",
+            "default": "#1e1e1e",
+            "description": "畫布之背景顏色"
+          },
+          "planist.board.gridType": {
+            "type": "string",
+            "enum": [
+              "none",
+              "dots",
+              "mesh"
+            ],
+            "default": "mesh",
+            "description": "畫布線框類型：無 (none)、點 (dots)、網格 (mesh)"
+          },
+          "planist.board.gridThickness": {
+            "type": "number",
+            "default": 1,
+            "description": "主網格線條/點之粗細 (px)"
+          },
+          "planist.board.gridColor": {
+            "type": "string",
+            "default": "rgba(255, 255, 255, 0.1)",
+            "description": "主網格線條/點之顏色 (支援 RGB/RGBA)"
+          },
+          "planist.board.majorGridSpacing": {
+            "type": "number",
+            "default": 50,
+            "description": "主要網格之間的間距 (px)"
+          },
+          "planist.board.subGridLines": {
+            "type": "number",
+            "default": 4,
+            "description": "主要網格內部的子網格線數量"
+          },
+          "planist.board.edgeRadius": {
+            "type": "number",
+            "default": 8,
+            "description": "流程圖連線之轉角圓滑程度 (px)"
+          },
+          "planist.entity.borderRadius": {
+            "type": "number",
+            "default": 14,
+            "description": "實體方塊之預設圓角程度 (px)"
+          },
+          "planist.entity.opacity": {
+            "type": "number",
+            "default": 0.9,
+            "description": "實體方塊之預設內部透明度 (0.0 到 1.0)"
+          },
+          "planist.entity.borderColor": {
+            "type": "string",
+            "default": "rgba(0, 90, 158, 1.0)",
+            "description": "實體方塊之預設邊框顏色"
+          }
+        }
+      },
+      {
+        "title": "渲染模式",
+        "properties": {
+          "planist.board.renderMode": {
+            "type": "string",
+            "enum": [
+              "default",
+              "uml"
+            ],
+            "default": "uml",
+            "description": "畫布互動與選取模式：預設模式 (default, 左鍵拖動平移/Shift框選)、架構設計模式 (uml, 左鍵直接框選/右鍵拖動平移)"
+          }
+        }
+      },
+      {
+        "title": "除錯模式",
+        "properties": {
+          "planist.debug.enable": {
+            "type": "boolean",
+            "default": false,
+            "description": "啟用除錯與詳細記錄日誌模式"
+          }
+        }
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -85,16 +271,21 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.120.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "typescript-eslint": "^8.56.1",
-    "eslint": "^9.39.3",
+    "@types/vscode": "^1.120.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.6.2",
     "esbuild": "^0.27.3",
+    "eslint": "^9.39.3",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.9.3",
-    "@vscode/vsce": "^3.6.2",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "typescript-eslint": "^8.56.1"
+  },
+  "dependencies": {
+    "cytoscape": "^3.34.0",
+    "cytoscape-dagre": "^3.0.0",
+    "dagre": "^0.8.5"
   }
 }
