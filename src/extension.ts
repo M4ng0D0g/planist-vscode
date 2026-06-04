@@ -31,11 +31,11 @@ import { PlnSemanticTokensProvider } from './providers/semanticProvider';
 import { PlnKeywordHighlighter } from './providers/highlighter';
 import { FlowCodeActionProvider } from './providers/codeActionProvider';
 import {
-	getOrCreatePreviewPanel,
-	togglePreviewMode,
-	refreshCurrentPreview,
-	refreshPreview,
-} from './webview/previewPanel';
+    getOrCreatePreviewPanel,
+    togglePreviewMode,
+    refreshPreview,
+	refreshCurrentPreview
+} from './preview/flowPreviewPanel';
 
 /**
  * 驗證開啟的文件是否為 Planist 的合法流程圖檔案
