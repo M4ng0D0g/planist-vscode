@@ -18,12 +18,15 @@
  */
 
 import * as path from 'path';
+import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { LogManager } from '../config/logger';
 import {
 	parseFlowDocuments,
 	FlowFieldDefinition,
 	FlowMethodCall,
+	parseExternalClass,
+	FlowMethodDefinition
 } from '../dsl/flowDsl';
 import { resolveShortcutPath } from '../utils/shortcutResolver';
 
@@ -158,6 +161,12 @@ export class FlowIndexer implements vscode.Disposable {
 		return undefined;
 	}
 
+	public getEntitiesByUri(uri: vscode.Uri): IndexedEntity[] {
+		const filePath = uri.fsPath;
+		const entityNames = this.fileToEntities.get(filePath) || [];
+		return entityNames.map(name => this.entities.get(name)).filter(Boolean) as IndexedEntity[];
+	}
+
 	private async indexFile(uri: vscode.Uri): Promise<void> {
 		// [除錯日誌] 紀錄輸入參數
 		LogManager.log('FlowIndexer: indexFile called with URI:', uri.fsPath);
@@ -214,7 +223,34 @@ export class FlowIndexer implements vscode.Disposable {
 		for (const parsed of parsedDocs) {
 			const entityName = parsed.entityName ?? this.stripExtension(path.basename(uri.fsPath));
 			
-			const indexedMethods: IndexedMethod[] = parsed.methods.map((m) => ({
+			let kind = parsed.blockKind;
+			let accessModifier = parsed.accessModifier ?? null;
+			let fields = parsed.fields;
+			let rawMethods = parsed.methods;
+
+			// 處理 bind 類型實體的外部載入
+			if (parsed.blockKind === 'bind' && parsed.referenceFiles) {
+				for (const refPath of parsed.referenceFiles) {
+					try {
+						const resolved = resolveShortcutPath(refPath, uri);
+						if (fs.existsSync(resolved)) {
+							const fileText = fs.readFileSync(resolved, 'utf8');
+							const parsedClass = parseExternalClass(fileText, entityName);
+							if (parsedClass) {
+								kind = parsedClass.kind;
+								accessModifier = parsedClass.accessModifier;
+								fields = parsedClass.fields;
+								rawMethods = parsedClass.methods;
+								break;
+							}
+						}
+					} catch (e) {
+						LogManager.error(`FlowIndexer: Failed to read external bind file: ${refPath}`, e);
+					}
+				}
+			}
+
+			const indexedMethods: IndexedMethod[] = rawMethods.map((m) => ({
 				name: m.name,
 				parameters: m.parameters,
 				line: m.line,
@@ -227,11 +263,11 @@ export class FlowIndexer implements vscode.Disposable {
 			const indexedEntity: IndexedEntity = {
 				uri,
 				entityName,
-				kind: parsed.blockKind,
-				accessModifier: parsed.accessModifier ?? null,
+				kind: kind,
+				accessModifier: accessModifier,
 				methods: indexedMethods,
 				rawText: text,
-				fields: parsed.fields,
+				fields: fields,
 				referenceFiles: parsed.referenceFiles,
 				relationTargets: parsed.relationTargets,
 				extendsTargets: parsed.extendsTargets,

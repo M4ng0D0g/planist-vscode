@@ -1,34 +1,45 @@
 import * as vscode from 'vscode';
 import { buildCompiledGraph } from '../core/graph/graphBuilder';
-import { findStartEntity, filterEntitiesByView, mapGraphEntity, MappedGraphEntity } from '../core/graph/graphTraversal';
+import { findStartEntities, filterEntitiesByView, mapGraphEntity, MappedGraphEntity, traverseCallChain } from '../core/graph/graphTraversal';
 import { loadPlanistConfig, resolveEntityStyle } from '../config/planistConfig';
 import { PatternManager } from '../config/patternManager';
 import { FlowIndexer } from '../indexing/flowIndexer';
 
-export async function prepareGraphData(indexer: FlowIndexer | undefined, viewMode: string): Promise<{
+// @state: red
+export async function prepareGraphData(
+    indexer: FlowIndexer | undefined, 
+    viewMode: string,
+    callChainStart?: { entityName: string; methodName: string }
+): Promise<{
     entities: MappedGraphEntity[];
     config: any;
-    boardConfig: any; // 加上這個回傳型別
+    boardConfig: any;
 }> {
     const config = await loadPlanistConfig();
     const graph = await buildCompiledGraph();
     const allEntities = graph.entities;
 
-    const activeEditor = vscode.window.activeTextEditor;
-    const activeText = activeEditor?.document.getText();
-    const activeUri = activeEditor?.document.uri;
+    let graphEntities: MappedGraphEntity[] = [];
 
-    const startEntity = findStartEntity(allEntities, activeText, activeUri, indexer);
-    const filteredEntities = filterEntitiesByView(allEntities, startEntity);
-    
-    const patterns = PatternManager.loadPatterns();
-    const graphEntities = filteredEntities.map(e => {
-        const mapped = mapGraphEntity(e, config, patterns);
-        mapped.renderStyle = resolveEntityStyle(e, config);
-        return mapped;
-    });
+    if (viewMode === 'callchain' && callChainStart) {
+        const result = traverseCallChain(allEntities, callChainStart.entityName, callChainStart.methodName);
+        graphEntities = result.nodes;
+    } else {
+        const activeEditor = vscode.window.activeTextEditor;
+        const activeText = activeEditor?.document.getText();
+        const activeUri = activeEditor?.document.uri;
 
-    // 🔥 【具體實作】從 VS Code settings.json 撈取使用者設定的畫布參數
+        const startEntities = findStartEntities(allEntities, activeText, activeUri, indexer);
+        const filteredEntities = filterEntitiesByView(allEntities, startEntities);
+        
+        const patterns = PatternManager.loadPatterns();
+        graphEntities = filteredEntities.map(e => {
+            const mapped = mapGraphEntity(e, config, patterns);
+            mapped.renderStyle = resolveEntityStyle(e, config);
+            return mapped;
+        });
+    }
+
     const planistConfig = vscode.workspace.getConfiguration('planist.board');
     const boardConfig = {
         backgroundColor: planistConfig.get<string>('backgroundColor', '#1e1e1e'),
@@ -44,6 +55,6 @@ export async function prepareGraphData(indexer: FlowIndexer | undefined, viewMod
     return {
         entities: graphEntities,
         config,
-        boardConfig // 將設定同步送出
+        boardConfig
     };
 }

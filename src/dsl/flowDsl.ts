@@ -33,6 +33,8 @@ export interface FlowReference {
 	line: number;
 	startCharacter: number;
 	endCharacter: number;
+	relationType?: string;
+	condition?: string;
 }
 
 /**
@@ -44,6 +46,8 @@ export interface FlowMethodCall {
 	line: number;
 	startCharacter: number;
 	endCharacter: number;
+	relationType?: string;
+	condition?: string;
 }
 
 /**
@@ -114,6 +118,7 @@ export interface FlowDocumentModel {
 	display?: string;          // 包裹顯示名稱
 	contains?: string[];        // 包裹明確包含的實體
 	parent?: string;            // 所屬的父級包裹
+	textBody?: string;          // 任意文字區塊內容
 }
 
 /**
@@ -156,6 +161,7 @@ export interface FlowGraphEntity {
 	display?: string;
 	contains?: string[];
 	parent?: string;
+	textBody?: string;
 }
 
 /**
@@ -170,21 +176,22 @@ export interface FlowGraphModel {
 // ----------------------------------------------------------------------------
 
 const entityPattern = /^\s*entity\s+([A-Za-z_][\w-]*)\s*$/i;
-const headerPattern = /^\s*(?:(?:(public|protected|private)\s+)|(?:(\+|-|#)\s*))?(class|abstract|interface|record|enum|text|bind|package|module)\s+([A-Za-z_][\w-]*)\s*\{?\s*$/i;
+const headerPattern = /^\s*(?:(?:(public|protected|private)\s+)|(?:(\+|-|#)\s*))?(class|abstract|interface|record|enum|text|bind|package|module)\s+([A-Za-z_][\w-]*)\s*\{?\s*\}?\s*$/i;
 const bindPattern = /^\s*bind:\s*["']?([^"']+)["']?\s*$/i;
 const autoImportPattern = /^\s*autoImport:\s*(true|false)\s*$/i;
 const stylePattern = /^\s*(?:style\.)?(color|borderColor|radius)\s*:\s*(.+)\s*$/i;
 const sectionPattern = /^\s*\[(Relations|Extends|Implements|Methods|Flow)\]\s*$/i;
-const methodPattern = /^\s*(?:(?:(public|protected|private)\s+)|(?:(\+|-|#)\s*))?((?:(?:final|static|const|variable)\s+)*)([A-Za-z_][\w-]*)\s*\(([^)]*)\)(?:\s*:\s*([A-Za-z0-9_<>\s\[\]]+))?\s*\{?\s*$/i;
+const methodPattern = /^\s*(?:(?:(public|protected|private)\s+)|(?:(\+|-|#)\s*))?((?:(?:final|static|const|variable)\s+)*)([A-Za-z_][\w-]*)\s*\(([^)]*)\)(?:\s*:\s*([A-Za-z0-9_<>\s\[\]\&\*\,\.\:]+))?\s*\{?\s*$/i;
 const referencePattern = /->\s*([A-Za-z_][\w-]*)(?:\.([A-Za-z_][\w-]*))?/g;
 const inlineRelationPattern = /^\s*(?:(public|protected|private)\s+)?(?:(extends|implements|inherits|associates|aggregates|composes|dependsOn)\s+->|([A-Za-z_][\w-]*)\s*:\s*->)\s*([A-Za-z_][\w-]*)\s*$/i;
-const fieldPattern = /^\s*(?:(?:(public|protected|private)\s+)|(?:(\+|-|#)\s*))?((?:(?:final|static|const|variable)\s+)*)([A-Za-z_][\w-]*)(?:\s*:\s*([A-Za-z0-9_<>\s\[\]]+))?\s*$/i;
+const fieldPattern = /^\s*(?:(?:(public|protected|private)\s+)|(?:(\+|-|#)\s*))?((?:(?:final|static|const|variable)\s+)*)([A-Za-z_][\w-]*)(?:\s*:\s*([A-Za-z0-9_<>\s\[\]\&\*\,\.\:]+))?\s*$/i;
 const dividerPattern = /^\s*---\s*(?:([Cc]enter|[Ll]eft|[Rr]ight)\s*:\s*(.+?))?\s*$/;
 const displayPattern = /^\s*display\s*:\s*["']?([^"']+)["']?\s*$/i;
 
 /**
  * 解析一個檔案內部所有的 FlowDocumentModel 實體
  */
+// @state: green
 export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 	// [除錯日誌] 紀錄方法開始與輸入參數
 	LogManager.log('parseFlowDocuments: start parsing text with length', text.length);
@@ -242,14 +249,34 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 		inVisualOverride: boolean;
 		display?: string;
 		contains: string[];
+		textLines?: string[];
 	} | null = null;
 
 	let activeComments: string[] = [];
 	let activePattern: string | undefined = undefined;
+	let inBlockComment = false;
 
 	for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
 		const line = lines[lineIndex];
 		const trimmed = line.trim();
+
+		if (inBlockComment) {
+			const endIdx = trimmed.indexOf('*/');
+			if (endIdx !== -1) {
+				const part = trimmed.substring(0, endIdx).trim();
+				const cleanPart = part.replace(/^\*+\s*/, '').trim();
+				if (cleanPart) {
+					activeComments.push(cleanPart);
+				}
+				inBlockComment = false;
+			} else {
+				const cleanPart = trimmed.replace(/^\*+\s*/, '').trim();
+				if (cleanPart) {
+					activeComments.push(cleanPart);
+				}
+			}
+			continue;
+		}
 
 		// 註解處理
 		if (trimmed.startsWith('//')) {
@@ -257,9 +284,22 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 			continue;
 		}
 		if (trimmed.startsWith('/*')) {
-			const clean = trimmed.replace(/^\/\*+/, '').replace(/\*+\/$/, '').trim();
-			if (clean) {
-				activeComments.push(clean);
+			const endIdx = trimmed.indexOf('*/', 2);
+			if (endIdx !== -1) {
+				// Single line block comment like /* hello */
+				const part = trimmed.substring(2, endIdx).trim();
+				const cleanPart = part.replace(/^\*+\s*/, '').trim();
+				if (cleanPart) {
+					activeComments.push(cleanPart);
+				}
+			} else {
+				// Multiline block comment start
+				const part = trimmed.substring(2).trim();
+				const cleanPart = part.replace(/^\*+\s*/, '').trim();
+				if (cleanPart) {
+					activeComments.push(cleanPart);
+				}
+				inBlockComment = true;
 			}
 			continue;
 		}
@@ -327,6 +367,7 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 				inVisualOverride: false,
 				display: undefined,
 				contains: [],
+				textLines: [],
 			};
 			activeComments = [];
 			activePattern = undefined;
@@ -369,39 +410,32 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 			continue;
 		}
 
-		// 處理實體內部細節
-		if (/^\s*\[Visual-Override\]\s*$/i.test(line)) {
-			currentEntity.inVisualOverride = true;
-			currentEntity.currentSection = 'general';
-			currentEntity.currentMethod = undefined;
-			activeComments = [];
-			continue;
-		}
-
-		if (currentEntity.inVisualOverride) {
-			const propMatch = line.match(/^\s*([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.+)\s*$/);
-			if (propMatch) {
-				const propName = propMatch[1].trim();
-				const propVal = propMatch[2].trim();
-				if (!currentEntity.visualOverride) {
-					currentEntity.visualOverride = {};
-				}
-				if (propName === 'borderColor') {
-					currentEntity.visualOverride.borderColor = propVal;
-				} else if (propName === 'borderRadius') {
-					const parsed = Number(propVal);
-					if (Number.isFinite(parsed)) {
-						currentEntity.visualOverride.borderRadius = parsed;
-					}
-				} else if (propName === 'opacity') {
-					const parsed = Number(propVal);
-					if (Number.isFinite(parsed)) {
-						currentEntity.visualOverride.opacity = parsed;
-					}
-				} else if (propName === 'color') {
-					currentEntity.visualOverride.color = propVal;
-				}
+		// 解析視覺覆寫（例如 @style.color: rgba(...), @style.borderColor, @style.borderRadius, @style.opacity 等）
+		const visualOverridePattern = /^\s*(?:@style\.?|style\.)(color|borderColor|borderRadius|opacity)\s*:\s*(.+)\s*$/i;
+		const voMatch = line.match(visualOverridePattern);
+		if (voMatch) {
+			const propName = voMatch[1].trim();
+			const propVal = voMatch[2].trim();
+			if (!currentEntity.visualOverride) {
+				currentEntity.visualOverride = {};
 			}
+			const lowerProp = propName.toLowerCase();
+			if (lowerProp === 'bordercolor') {
+				currentEntity.visualOverride.borderColor = propVal;
+			} else if (lowerProp === 'borderradius') {
+				const parsed = Number(propVal);
+				if (Number.isFinite(parsed)) {
+					currentEntity.visualOverride.borderRadius = parsed;
+				}
+			} else if (lowerProp === 'opacity') {
+				const parsed = Number(propVal);
+				if (Number.isFinite(parsed)) {
+					currentEntity.visualOverride.opacity = parsed;
+				}
+			} else if (lowerProp === 'color') {
+				currentEntity.visualOverride.color = propVal;
+			}
+			activeComments = [];
 			continue;
 		}
 
@@ -511,10 +545,9 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 				}
 			}
 		}
-
 		// 解析方法
 		if (currentEntity.currentSection === 'methods' || currentEntity.currentSection === 'general') {
-			if (methodMatch) {
+			if (methodMatch && !['if', 'while', 'for', 'switch', 'catch', 'else'].includes(methodMatch[4])) {
 				const accessMod = methodMatch[1] || methodMatch[2] || null;
 				const modifiersStr = methodMatch[3] || '';
 				const modifiers = modifiersStr.trim().split(/\s+/).filter(Boolean);
@@ -530,6 +563,11 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 					returnType: methodMatch[6] ? methodMatch[6].trim() : null,
 					comments: [...activeComments],
 				};
+				const hasBrace = /\{/.test(line);
+				(currentEntity.currentMethod as any).braceDepth = hasBrace ? 1 : 0;
+				(currentEntity.currentMethod as any).hasBrace = hasBrace;
+				(currentEntity.currentMethod as any).activeCondition = undefined;
+
 				currentEntity.methods.push(currentEntity.currentMethod);
 				currentEntity.members.push({ type: 'method', method: currentEntity.currentMethod });
 				activeComments = [];
@@ -537,6 +575,28 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 			}
 
 			if (currentEntity.currentMethod) {
+				const method = currentEntity.currentMethod as any;
+				const opens = (line.match(/\{/g) || []).length;
+				const closes = (line.match(/\}/g) || []).length;
+
+				if (!method.hasBrace) {
+					if (opens > 0) {
+						method.hasBrace = true;
+						method.braceDepth = opens - closes;
+					}
+				} else {
+					method.braceDepth += opens - closes;
+				}
+
+				const ifMatch = trimmed.match(/^(?:\}\s*)?if\s*\(([^)]+)\)/i);
+				const elseMatch = trimmed.match(/^(?:\}\s*)?else(?:\s+if\s*\(([^)]+)\))?/i);
+
+				if (ifMatch) {
+					method.activeCondition = ifMatch[1].trim();
+				} else if (elseMatch) {
+					method.activeCondition = elseMatch[1] ? elseMatch[1].trim() : 'else';
+				}
+
 				collectReferenceMatches(line, lineIndex, (reference) => {
 					currentEntity?.currentMethod?.callsTo.push({
 						targetName: reference.targetName,
@@ -544,10 +604,16 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 						line: reference.line,
 						startCharacter: reference.startCharacter,
 						endCharacter: reference.endCharacter,
+						relationType: reference.relationType,
+						condition: method.activeCondition,
 					});
 				});
 
-				if (/\}/.test(line)) {
+				if (closes > 0 && method.braceDepth > 0 && !ifMatch && !elseMatch) {
+					method.activeCondition = undefined;
+				}
+
+				if (method.hasBrace && method.braceDepth <= 0) {
 					currentEntity.currentMethod = undefined;
 				}
 				activeComments = [];
@@ -586,6 +652,17 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 			});
 		}
 
+		// 收集 text 區塊文字內容
+		if (currentEntity && currentEntity.blockKind === 'text') {
+			const trimmedLine = line.trim();
+			if (trimmedLine && trimmedLine !== '{' && trimmedLine !== '}' && !trimmedLine.startsWith('//') && !trimmedLine.startsWith('/*')) {
+				if (!currentEntity.textLines) {
+					currentEntity.textLines = [];
+				}
+				currentEntity.textLines.push(trimmedLine);
+			}
+		}
+
 		// 關閉實體
 		if (currentEntity && currentEntity.hasBraces && currentEntity.braceDepth <= 0) {
 			documents.push(finalizeEntity(currentEntity, referenceFiles));
@@ -615,6 +692,7 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 	return documents;
 }
 
+// @state: green
 function finalizeEntity(entity: any, referenceFiles: string[]): FlowDocumentModel {
 	return {
 		entityName: entity.entityName,
@@ -643,6 +721,7 @@ function finalizeEntity(entity: any, referenceFiles: string[]): FlowDocumentMode
 		referenceFiles: referenceFiles,
 		display: entity.display,
 		contains: entity.contains && entity.contains.length > 0 ? entity.contains : undefined,
+		textBody: entity.textLines && entity.textLines.length > 0 ? entity.textLines.join('\n') : undefined,
 	};
 }
 
@@ -707,7 +786,7 @@ export interface ExternalParsedClass {
  * 解析標準程式語言原始碼中的類別屬性與方法
  */
 export function parseExternalClass(fileText: string, className: string): ExternalParsedClass | undefined {
-	const headerRegex = new RegExp('(?:\\b(public|protected|private)\\s+)?(?:\\b(abstract|class|interface|enum|record)\\s+)' + className + '\\b', 'i');
+	const headerRegex = new RegExp('(?:\\b(public|protected|private)\\s+)?(?:\\b(abstract|class|interface|enum|record|struct)\\s+)' + className + '\\b', 'i');
 	const headerMatch = fileText.match(headerRegex);
 	if (!headerMatch) {
 		return undefined;
@@ -781,12 +860,8 @@ export function parseExternalClass(fileText: string, className: string): Externa
 	const methods: FlowMethodDefinition[] = [];
 	const members: ExternalParsedClass['members'] = [];
 
+	let activeAccessSpecifier = kind === 'struct' ? 'public' : 'private';
 	let activeComments: string[] = [];
-
-	// 方法比對正則 (包含 Java 及 TypeScript/C# 風格)
-	const methodRegex = /^\s*(?:(public|protected|private)\s+)?((?:(?:static|final|async|const|readonly|public|protected|private)\s+)*)(?:([A-Za-z_]\w*(?:<[^>]+>)?(?:\[\])?)\s+)?([A-Za-z_]\w*)\s*\(([^)]*)\)(?:\s*:\s*([A-Za-z_]\w*(?:<[^>]+>)?(?:\[\])?))?/;
-	// 屬性比對正則
-	const fieldRegex = /^\s*(?:(public|protected|private)\s+)?((?:(?:static|final|const|readonly|public|protected|private)\s+)*)(?:([A-Za-z_]\w*(?:<[^>]+>)?(?:\[\])?)\s+)?([A-Za-z_]\w*)\s*(?::\s*([A-Za-z_]\w*(?:<[^>]+>)?(?:\[\])?))?\s*(?:=.*)?(?:;)?\s*$/;
 
 	for (let lineIndex = 0; lineIndex < bodyLines.length; lineIndex++) {
 		const line = bodyLines[lineIndex];
@@ -807,19 +882,45 @@ export function parseExternalClass(fileText: string, className: string): Externa
 			continue;
 		}
 
+		// 偵測 C++ 存取修飾區塊標籤 (public:, protected:, private:)
+		const specifierMatch = trimmed.match(/^\s*(public|protected|private)\s*:/i);
+		if (specifierMatch) {
+			activeAccessSpecifier = specifierMatch[1].toLowerCase();
+			activeComments = [];
+			continue;
+		}
+
 		const isMethod = trimmed.includes('(');
 		if (isMethod) {
-			const mMatch = line.match(methodRegex);
+			// C++ / OOP 方法比對正則 (支援 virtual, namespace::, *, &, templates, explicit, UML/shorthand access symbols)
+			const cppMethodRegex = /^\s*(?:(?:(public|protected|private)\s+)|(?:(\+|-|#)\s*))?((?:(?:virtual|static|inline|const|explicit|friend|async|readonly|public|protected|private)\s+)*)(?:([\w\:\*\&\<\>\[\]]+(?:\s+|[\*\&]\s*)))?([A-Za-z_]\w*)\s*\(([^)]*)\)/;
+			const mMatch = line.match(cppMethodRegex);
 			if (mMatch) {
 				const accessModRaw = mMatch[1];
-				const accessModifier = accessModRaw === 'private' ? '-' : (accessModRaw === 'protected' ? '#' : '+');
-				const modifiersStr = mMatch[2] || '';
+				const accessSymRaw = mMatch[2];
+				let accessModifier = '+';
+				if (accessModRaw) {
+					accessModifier = accessModRaw === 'private' ? '-' : (accessModRaw === 'protected' ? '#' : '+');
+				} else if (accessSymRaw) {
+					accessModifier = accessSymRaw;
+				} else if (activeAccessSpecifier) {
+					accessModifier = activeAccessSpecifier === 'private' ? '-' : (activeAccessSpecifier === 'protected' ? '#' : '+');
+				} else {
+					accessModifier = kind === 'struct' ? '+' : '-';
+				}
+
+				const modifiersStr = mMatch[3] || '';
 				const modifiers = modifiersStr.trim().split(/\s+/).filter(Boolean);
 				
-				const returnType = mMatch[6] ? mMatch[6].trim() : (mMatch[3] ? mMatch[3].trim() : null);
-				const name = mMatch[4];
-				const paramsRaw = mMatch[5];
-				
+				const returnType = mMatch[4] ? mMatch[4].trim() : null;
+				const name = mMatch[5];
+				const paramsRaw = mMatch[6];
+
+				// 排除控制結構
+				if (['if', 'while', 'for', 'switch', 'catch'].includes(name)) {
+					continue;
+				}
+
 				const parameters = paramsRaw.split(',').map(p => {
 					const parts = p.trim().split(/\s+/);
 					const lastPart = parts[parts.length - 1];
@@ -847,17 +948,30 @@ export function parseExternalClass(fileText: string, className: string): Externa
 				continue;
 			}
 		} else {
-			const fMatch = line.match(fieldRegex);
+			// C++ / OOP 欄位比對正則 (支援 const, constexpr, mutable, pointer, reference, UML/shorthand access symbols)
+			const cppFieldRegex = /^\s*(?:(?:(public|protected|private)\s+)|(?:(\+|-|#)\s*))?((?:(?:static|const|constexpr|mutable|readonly|final)\s+)*)([\w\:\*\&\<\>\[\]]+)\s+([A-Za-z_]\w*)\s*(?:=.*)?(?:;)?\s*$/;
+			let fMatch = line.match(cppFieldRegex);
+			
 			if (fMatch) {
 				const accessModRaw = fMatch[1];
-				const accessModifier = accessModRaw === 'private' ? '-' : (accessModRaw === 'protected' ? '#' : '+');
-				const modifiersStr = fMatch[2] || '';
-				const modifiers = modifiersStr.trim().split(/\s+/).filter(Boolean);
-				
-				const type = fMatch[5] ? fMatch[5].trim() : (fMatch[3] ? fMatch[3].trim() : null);
-				const name = fMatch[4];
+				const accessSymRaw = fMatch[2];
+				let accessModifier = '+';
+				if (accessModRaw) {
+					accessModifier = accessModRaw === 'private' ? '-' : (accessModRaw === 'protected' ? '#' : '+');
+				} else if (accessSymRaw) {
+					accessModifier = accessSymRaw;
+				} else if (activeAccessSpecifier) {
+					accessModifier = activeAccessSpecifier === 'private' ? '-' : (activeAccessSpecifier === 'protected' ? '#' : '+');
+				} else {
+					accessModifier = kind === 'struct' ? '+' : '-';
+				}
 
-				if (name === 'return' || name === 'break' || name === 'continue' || name === 'throw') {
+				const modifiersStr = fMatch[3] || '';
+				const modifiers = modifiersStr.trim().split(/\s+/).filter(Boolean);
+				const type = fMatch[4] ? fMatch[4].trim() : null;
+				const name = fMatch[5];
+
+				if (['return', 'break', 'continue', 'throw'].includes(name)) {
 					activeComments = [];
 					continue;
 				}
@@ -874,6 +988,47 @@ export function parseExternalClass(fileText: string, className: string): Externa
 				members.push({ type: 'field', field: fieldNode });
 				activeComments = [];
 				continue;
+			} else {
+				// TypeScript / JS 欄位比對正則 (名稱在前，型別在後且帶冒號, UML/shorthand access symbols)
+				const tsFieldRegex = /^\s*(?:(?:(public|protected|private)\s+)|(?:(\+|-|#)\s*))?((?:(?:static|readonly|public|protected|private)\s+)*)([A-Za-z_]\w*)\s*(?::\s*([\w\:\*\&\<\>\[\]]+))?\s*(?:=.*)?(?:;)?\s*$/;
+				fMatch = line.match(tsFieldRegex);
+				if (fMatch) {
+					const accessModRaw = fMatch[1];
+					const accessSymRaw = fMatch[2];
+					let accessModifier = '+';
+					if (accessModRaw) {
+						accessModifier = accessModRaw === 'private' ? '-' : (accessModRaw === 'protected' ? '#' : '+');
+					} else if (accessSymRaw) {
+						accessModifier = accessSymRaw;
+					} else if (activeAccessSpecifier) {
+						accessModifier = activeAccessSpecifier === 'private' ? '-' : (activeAccessSpecifier === 'protected' ? '#' : '+');
+					} else {
+						accessModifier = kind === 'struct' ? '+' : '-';
+					}
+
+					const modifiersStr = fMatch[3] || '';
+					const modifiers = modifiersStr.trim().split(/\s+/).filter(Boolean);
+					const name = fMatch[4];
+					const type = fMatch[5] ? fMatch[5].trim() : null;
+
+					if (['return', 'break', 'continue', 'throw'].includes(name)) {
+						activeComments = [];
+						continue;
+					}
+
+					const fieldNode: FlowFieldDefinition = {
+						name,
+						type,
+						accessModifier,
+						modifiers: modifiers.length > 0 ? modifiers : undefined,
+						line: lineIndex,
+						comments: [...activeComments],
+					};
+					fields.push(fieldNode);
+					members.push({ type: 'field', field: fieldNode });
+					activeComments = [];
+					continue;
+				}
 			}
 		}
 
@@ -942,7 +1097,7 @@ export function findMethodDeclarationLine(text: string, methodName: string): num
  */
 export function findEntityDeclarationLine(text: string, entityName: string): number | undefined {
 	const lines = text.split(/\r?\n/);
-	const entityLinePattern = new RegExp(`^\\s*(?:[\\+\\-#]|public|private|protected)?\\s*(class|abstract|interface|record|enum|text|bind|package|module)?\\s*${escapeRegExp(entityName)}\\b`, 'i');
+	const entityLinePattern = new RegExp(`^\\s*(?:[\\+\\-#]|public|private|protected)?\\s*(class|abstract|interface|record|enum|text|bind|package|module|entity)?\\s*${escapeRegExp(entityName)}\\b`, 'i');
 
 	for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
 		if (entityLinePattern.test(lines[lineIndex])) {
@@ -1113,12 +1268,22 @@ function collectReferenceMatches(
 			? startCharacter + match[1].length + 1 + match[2].length
 			: startCharacter + match[1].length;
 
+		// Detect relationType ('new' or 'emit')
+		const before = line.substring(0, match.index).trim();
+		let relationType: string | undefined = undefined;
+		if (/\bnew\s*$/i.test(before)) {
+			relationType = 'new';
+		} else if (/\bemit\s*$/i.test(before)) {
+			relationType = 'emit';
+		}
+
 		collector({
 			targetName: match[1],
 			targetMethodName: match[2] ?? null,
 			line: lineIndex,
 			startCharacter,
 			endCharacter,
+			relationType,
 		});
 	}
 }

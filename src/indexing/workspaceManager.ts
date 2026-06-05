@@ -47,21 +47,52 @@ export class WorkspaceManager {
 		const document = await vscode.workspace.openTextDocument(fileUri);
 		const fullText = document.getText();
 		
-		// 2. 利用切分點分離原文本與舊的 Override 區塊
-		const overrideMarker = '[Visual-Override]';
-		const markerIndex = fullText.indexOf(overrideMarker);
-		
-		let baseContent = markerIndex !== -1 ? fullText.substring(0, markerIndex).trim() : fullText.trim();
-		
-		// 3. 重新構建精準的 Override 文本資料
-		let overrideText = `\n\n${overrideMarker}\n`;
-		if (overrides.color) { overrideText += `color: ${overrides.color}\n`; }
-		if (overrides.borderColor) { overrideText += `borderColor: ${overrides.borderColor}\n`; }
-		if (overrides.borderRadius !== undefined) { overrideText += `borderRadius: ${overrides.borderRadius}\n`; }
-		if (overrides.opacity !== undefined) { overrideText += `opacity: ${overrides.opacity}\n`; }
+		// 2. 移除原文字中所有舊式的 [Visual-Override] 及所有 @style. 或 style. 屬性行
+		const lines = fullText.split(/\r?\n/);
+		const cleanLines: string[] = [];
+		let inLegacyVisualOverride = false;
+		for (const line of lines) {
+			const trimmed = line.trim();
+			if (/^\[Visual-Override\]$/i.test(trimmed)) {
+				inLegacyVisualOverride = true;
+				continue;
+			}
+			if (inLegacyVisualOverride) {
+				if (/^(color|borderColor|borderRadius|opacity)\s*:/i.test(trimmed)) {
+					continue;
+				}
+				inLegacyVisualOverride = false;
+			}
+			if (/^\s*(?:@style\.?|style\.)(color|borderColor|borderRadius|opacity)\s*:/i.test(trimmed)) {
+				continue;
+			}
+			cleanLines.push(line);
+		}
 
-		// 4. 合併並非同步寫入檔案系統
-		const combinedData = Buffer.from(baseContent + overrideText, 'utf8');
+		// 3. 尋找 entity 區塊的結束括號 '}'
+		let insertIndex = cleanLines.length;
+		for (let i = cleanLines.length - 1; i >= 0; i--) {
+			if (cleanLines[i].trim() === '}') {
+				insertIndex = i;
+				break;
+			}
+		}
+
+		// 4. 重新構建視覺參數覆寫行
+		const newStyleLines: string[] = [];
+		if (overrides.color) { newStyleLines.push(`    @style.color: ${overrides.color}`); }
+		if (overrides.borderColor) { newStyleLines.push(`    @style.borderColor: ${overrides.borderColor}`); }
+		if (overrides.borderRadius !== undefined) { newStyleLines.push(`    @style.borderRadius: ${overrides.borderRadius}`); }
+		if (overrides.opacity !== undefined) { newStyleLines.push(`    @style.opacity: ${overrides.opacity}`); }
+
+		if (insertIndex < cleanLines.length) {
+			cleanLines.splice(insertIndex, 0, ...newStyleLines);
+		} else {
+			cleanLines.push(...newStyleLines);
+		}
+
+		// 5. 非同步寫入檔案系統
+		const combinedData = Buffer.from(cleanLines.join('\n'), 'utf8');
 		await vscode.workspace.fs.writeFile(fileUri, combinedData);
 
 		// [除錯日誌] 記錄更新成功

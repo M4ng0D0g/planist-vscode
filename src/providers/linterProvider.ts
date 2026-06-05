@@ -123,15 +123,14 @@ export class FlowLinter implements vscode.Disposable {
 		const headerRegex = /^\s*(class|abstract|interface|record|enum|text|bind|package|module)\s+([A-Za-z_][\w-]*)\b/i;
 		const referenceRegex = /^\s*(?:#?reference|#?refer)\b/i;
 		const styleRegex = /^\s*(?:style\.)?(color|borderColor|radius)\s*:/i;
-		const visualOverrideRegex = /^\s*\[Visual-Override\]/i;
-		const methodHeaderRegex = /^\s*(?:(public|protected|private|\+|-|#)\s+)?([A-Za-z_][\w-]*)\s*\(/i;
+		const visualOverrideRegex = /^\s*(?:@style\.?|style\.)(color|borderColor|borderRadius|opacity)\s*:/i;
+		const methodHeaderRegex = /^\s*(?:(public|protected|private|\+|-|#)\s+)?(?:(?:final|static|const|variable)\s+)*([A-Za-z_][\w-]*)\s*\(/i;
 		const dividerRegex = /^\s*---\s*(?:([Cc]enter|[Ll]eft|[Rr]ight)\s*:\s*(.+?))?\s*$/;
 
 		let inClassBlock = false;
 		let classHeaderLine = -1;
 		let classHeaderName = '';
 		let bracesCount = 0;
-		let inVisualOverride = false;
 		let entityDeclarationsCount = 0;
 
 		lines.forEach((lineText, lineIndex) => {
@@ -145,29 +144,9 @@ export class FlowLinter implements vscode.Disposable {
 				return;
 			}
 
-			// 特殊的視覺 Override 標記
-			if (visualOverrideRegex.test(trimmed)) {
-				inVisualOverride = true;
-				return;
-			}
-
-			if (inVisualOverride) {
-				return;
-			}
-
 			// 檢查實體宣告頭部
 			const headerMatch = lineText.match(headerRegex);
 			if (headerMatch) {
-				entityDeclarationsCount++;
-				if (entityDeclarationsCount > 1) {
-					const startIdx = lineText.indexOf(headerMatch[1]);
-					const range = new vscode.Range(lineIndex, startIdx, lineIndex, startIdx + headerMatch[1].length + 1 + headerMatch[2].length);
-					diagnostics.push(new vscode.Diagnostic(
-						range,
-						`每個檔案只能定義一個 entity。`,
-						vscode.DiagnosticSeverity.Error
-					));
-				}
 				classHeaderLine = lineIndex;
 				classHeaderName = headerMatch[2];
 				inClassBlock = true;
@@ -203,7 +182,7 @@ export class FlowLinter implements vscode.Disposable {
 
 			// 語意規則：外部屬性定義警告
 			if (!inClassBlock && lineIndex !== classHeaderLine && bracesCount === 0) {
-				const isAllowed = referenceRegex.test(trimmed) || styleRegex.test(trimmed) || headerRegex.test(trimmed);
+				const isAllowed = referenceRegex.test(trimmed) || styleRegex.test(trimmed) || headerRegex.test(trimmed) || visualOverrideRegex.test(trimmed);
 				if (!isAllowed) {
 					if (trimmed.includes('->') || trimmed.includes(':') || methodHeaderRegex.test(trimmed) || dividerRegex.test(trimmed)) {
 						const range = new vscode.Range(lineIndex, 0, lineIndex, lineText.length);
@@ -218,11 +197,12 @@ export class FlowLinter implements vscode.Disposable {
 
 			// 語意規則：類別內部方法宣告格式校驗
 			if (inClassBlock) {
-				const isMethodStart = trimmed.startsWith('+') || (trimmed.startsWith('-') && !trimmed.startsWith('->')) || trimmed.startsWith('#') ||
-					trimmed.startsWith('public') || trimmed.startsWith('private') || trimmed.startsWith('protected');
+				const isMethodStart = (trimmed.startsWith('+') || (trimmed.startsWith('-') && !trimmed.startsWith('->')) || trimmed.startsWith('#') ||
+					trimmed.startsWith('public') || trimmed.startsWith('private') || trimmed.startsWith('protected') ||
+					trimmed.startsWith('static') || trimmed.startsWith('final') || trimmed.startsWith('const') || trimmed.startsWith('variable')) && trimmed.includes('(');
 				
 				if (isMethodStart) {
-					const methodPattern = /^\s*(?:(public|protected|private|\+|-|#)\s+)?([A-Za-z_][\w-]*)\s*\(([^)]*)\)(?:\s*:\s*([A-Za-z0-9_<>\s\[\]]+))?\s*\{?\s*$/i;
+					const methodPattern = /^\s*(?:(?:(public|protected|private)\s+)|(?:(\+|-|#)\s*))?((?:(?:final|static|const|variable)\s+)*)([A-Za-z_][\w-]*)\s*\(([^)]*)\)(?:\s*:\s*([A-Za-z0-9_<>\s\[\]\&\*\,\.\:]+))?\s*\{?\s*$/i;
 					if (!methodPattern.test(lineText)) {
 						const range = new vscode.Range(lineIndex, 0, lineIndex, lineText.length);
 						diagnostics.push(new vscode.Diagnostic(

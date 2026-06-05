@@ -30,6 +30,13 @@
         }
       }
     ],
+    "grammars": [
+      {
+        "language": "flowlang",
+        "scopeName": "source.pln",
+        "path": "./syntaxes/planist.tmLanguage.json"
+      }
+    ],
     "commands": [
       {
         "command": "planist-vscode.previewFlow",
@@ -226,6 +233,11 @@
             "type": "string",
             "default": "rgba(0, 90, 158, 1.0)",
             "description": "實體方塊之預設邊框顏色"
+          },
+          "planist.entity.followBorderColor": {
+            "type": "boolean",
+            "default": false,
+            "description": "實體方塊之填滿顏色是否跟隨邊框顏色"
           }
         }
       },
@@ -268,7 +280,8 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
     "package:vsix": "vsce package --no-dependencies --no-yarn",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "test:unit": "vitest run src/test/unit"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -279,9 +292,11 @@
     "@vscode/vsce": "^3.6.2",
     "esbuild": "^0.27.3",
     "eslint": "^9.39.3",
+    "jsdom": "^24.1.0",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1"
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^1.6.0"
   },
   "dependencies": {
     "cytoscape": "^3.34.0",

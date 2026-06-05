@@ -182,16 +182,91 @@ suite('Flow DSL helpers', () => {
 
 
 
-	test('parses visual overrides at the bottom', () => {
+	test('parses public static final and complex return types with array, generics, const, pointers/references', () => {
+		const parsed = parseFlowDocument(
+			'class TestClass {\n' +
+			'  public static final method1(): void {\n' +
+			'  }\n' +
+			'  # method2(): const std::map<int, std::vector<char>>* const& {\n' +
+			'  }\n' +
+			'  myField: const int*\n' +
+			'}\n'
+		);
+
+		assert.strictEqual(parsed.entityName, 'TestClass');
+		
+		// fields
+		assert.strictEqual(parsed.fields[0]?.name, 'myField');
+		assert.strictEqual(parsed.fields[0]?.type, 'const int*');
+
+		// methods
+		assert.strictEqual(parsed.methods[0]?.name, 'method1');
+		assert.strictEqual(parsed.methods[0]?.accessModifier, 'public');
+		assert.deepStrictEqual(parsed.methods[0]?.modifiers, ['static', 'final']);
+		assert.strictEqual(parsed.methods[0]?.returnType, 'void');
+
+		assert.strictEqual(parsed.methods[1]?.name, 'method2');
+		assert.strictEqual(parsed.methods[1]?.accessModifier, '#');
+		assert.strictEqual(parsed.methods[1]?.returnType, 'const std::map<int, std::vector<char>>* const&');
+	});
+
+	test('parses instantiation, emit events, and conditional method blocks', () => {
+		const parsed = parseFlowDocument(
+			'class OrderService {\n' +
+			'  public createOrder(): void {\n' +
+			'    new -> Order\n' +
+			'    if (isVIP) {\n' +
+			'      -> VIPDiscount.apply()\n' +
+			'    } else {\n' +
+			'      -> RegularDiscount.apply()\n' +
+			'    }\n' +
+			'  }\n' +
+			'  public charge(): void {\n' +
+			'    emit -> PaymentEvent.Success\n' +
+			'  }\n' +
+			'}\n'
+		);
+
+		assert.strictEqual(parsed.entityName, 'OrderService');
+		assert.strictEqual(parsed.methods.length, 2);
+
+		// method 1: createOrder
+		const m1 = parsed.methods[0];
+		assert.strictEqual(m1.name, 'createOrder');
+		assert.strictEqual(m1.callsTo.length, 3);
+		
+		// new -> Order
+		assert.strictEqual(m1.callsTo[0].targetName, 'Order');
+		assert.strictEqual(m1.callsTo[0].relationType, 'new');
+		assert.strictEqual(m1.callsTo[0].condition, undefined);
+
+		// if (isVIP) -> VIPDiscount
+		assert.strictEqual(m1.callsTo[1].targetName, 'VIPDiscount');
+		assert.strictEqual(m1.callsTo[1].condition, 'isVIP');
+
+		// else -> RegularDiscount
+		assert.strictEqual(m1.callsTo[2].targetName, 'RegularDiscount');
+		assert.strictEqual(m1.callsTo[2].condition, 'else');
+
+		// method 2: charge
+		const m2 = parsed.methods[1];
+		assert.strictEqual(m2.name, 'charge');
+		assert.strictEqual(m2.callsTo.length, 1);
+		
+		// emit -> PaymentEvent.Success
+		assert.strictEqual(m2.callsTo[0].targetName, 'PaymentEvent');
+		assert.strictEqual(m2.callsTo[0].targetMethodName, 'Success');
+		assert.strictEqual(m2.callsTo[0].relationType, 'emit');
+	});
+
+	test('parses visual overrides', () => {
 		const parsed = parseFlowDocument(
 			'class OrderController {\n' +
-			'}\n' +
-			'\n' +
-			'[Visual-Override]\n' +
-			'color: rgba(75, 192, 192, 1.0)\n' +
-			'borderColor: rgba(255, 99, 132, 1.0)\n' +
-			'borderRadius: 12\n' +
-			'opacity: 0.85\n'
+			'    @style.color: rgba(75, 192, 192, 1.0)\n' +
+			'    @style.borderColor: rgba(255, 99, 132, 1.0)\n' +
+			'    @style.borderRadius: 12\n' +
+			'    @style.opacity: 0.85\n' +
+			'}\n'
 		);
 
 		assert.deepStrictEqual(parsed.visualOverride, {
@@ -257,6 +332,19 @@ suite('Flow DSL helpers', () => {
 		assert.strictEqual(parsedMod.entityName, 'MyMod');
 		assert.strictEqual(parsedMod.display, 'My Beautiful Module');
 		assert.deepStrictEqual(parsedMod.contains, ['ChildC']);
+	});
+
+	test('parses text block kinds and extracts textBody content', () => {
+		const parsedText = parseFlowDocument(
+			'text MyText {\n' +
+			'  Line 1 of text\n' +
+			'  Line 2 of text\n' +
+			'  style.color: #fff\n' +
+			'}\n'
+		);
+		assert.strictEqual(parsedText.blockKind, 'text');
+		assert.strictEqual(parsedText.entityName, 'MyText');
+		assert.strictEqual(parsedText.textBody, 'Line 1 of text\nLine 2 of text');
 	});
 
 	test('buildFlowGraphModel maps parent packages correctly', () => {

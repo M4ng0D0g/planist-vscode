@@ -20,7 +20,7 @@ import { LogManager } from '../config/logger';
 import { FLOW_LANGUAGE_ID } from '../dsl/flowDsl';
 
 export class PlnSemanticTokensProvider implements vscode.DocumentSemanticTokensProvider {
-	private readonly tokenTypes = ['class', 'abstract', 'interface', 'record', 'enum', 'text', 'bind', 'package', 'module'];
+	private readonly tokenTypes = ['keyword', 'macro', 'comment', 'string', 'number', 'type'];
 	public readonly legend = new vscode.SemanticTokensLegend(this.tokenTypes, []);
 
 	public provideDocumentSemanticTokens(
@@ -42,18 +42,33 @@ export class PlnSemanticTokensProvider implements vscode.DocumentSemanticTokensP
 
 		// 配對實體宣告頭部關鍵字的正則
 		const headerRegex = /^\s*(class|abstract|interface|record|enum|text|bind|package|module)\b/i;
+		// 配對巨集全域指令的正則
+		const directiveRegex = /^\s*(#?reference|#?refer|#schema)\b/i;
 
 		lines.forEach((lineText, lineIndex) => {
 			const m = lineText.match(headerRegex);
 			if (m) {
-				const kind = m[1].toLowerCase();
 				const keywordIndex = lineText.indexOf(m[1]);
 				if (keywordIndex !== -1) {
 					builder.push(
 						lineIndex,
 						keywordIndex,
 						m[1].length,
-						this.tokenTypes.indexOf(kind),
+						this.tokenTypes.indexOf('keyword'),
+						0
+					);
+				}
+			}
+
+			const dm = lineText.match(directiveRegex);
+			if (dm) {
+				const keywordIndex = lineText.indexOf(dm[1]);
+				if (keywordIndex !== -1) {
+					builder.push(
+						lineIndex,
+						keywordIndex,
+						dm[1].length,
+						this.tokenTypes.indexOf('macro'),
 						0
 					);
 				}

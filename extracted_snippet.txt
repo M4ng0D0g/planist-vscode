@@ -1,0 +1,78 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FlowSchemaJS = void 0;
+exports.FlowSchemaJS = `
+(function() {
+    console.log('====== Planist 網格畫布前端核心啟動 ======');
+    const vscode = acquireVsCodeApi();
+    let cyInstance = null;
+
+    // 1. 初始化 Cytoscape 畫布與高級動態網格背景
+    function initCanvas(boardConfig) {
+        const cyContainer = document.getElementById('cy');
+        
+        // 套用動態網格配置解算器
+        applyGridStyle(cyContainer, boardConfig);
+
+        cyInstance = cytoscape({
+            container: cyContainer,
+            boxSelectionEnabled: false,
+            autounselectify: true,
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'background-color': 'data(backgroundColor)',
+                        'border-color': 'data(borderColor)',
+                        'border-width': '1px',
+                        'corner-radius': 'data(borderRadius)',
+                        'background-opacity': 'data(backgroundOpacity)',
+                        'label': 'data(labelText)',
+                        'color': '#fff',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'text-wrap': 'wrap',
+                        'text-justification': 'left',
+                        'font-size': '11px',
+                        'width': 'data(width)',
+                        'heigh
+                    'inheritsTargets', 'associatesTargets', 'aggregatesTargets', 
+                    'composesTargets', 'dependsOnTargets'
+                ];
+                relKeys.forEach(relKey => {
+                    const targets = entity[relKey] || [];
+                    let relationType = 'relation';
+                    if (relKey === 'extendsTargets') relationType = 'extends';
+                    else if (relKey === 'implementsTargets') relationType = 'implements';
+                    else if (relKey === 'inheritsTargets') relationType = 'inherits';
+                    else if (relKey === 'associatesTargets') relationType = 'associates';
+                    else if (relKey === 'aggregatesTargets') relationType = 'aggregates';
+                    else if (relKey === 'composesTargets') relationType = 'composes';
+                    else if (relKey === 'dependsOnTargets') relationType = 'dependsOn';
+
+                    targets.forEach(target => {
+                        elements.push({
+                            data: {
+                                id: entity.name + '-' + relationType + '-' + target,
+                                source: entity.name,
+                                target: target,
+                                relationType: relationType
+                            }
+                        });
+                    });
+                });
+            });
+
+            cyInstance.json({ elements: elements });
+            runLayout();
+        }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+        // 首次啟動先傳入預設空配置
+        initCanvas(null);
+        vscode.postMessage({ command: 'ready' });
+    });
+})();
+`;
+//# sourceMappingURL=FlowSchemaJS.js.map

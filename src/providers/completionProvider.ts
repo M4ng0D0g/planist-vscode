@@ -17,11 +17,13 @@
  */
 
 import * as path from 'path';
+import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { LogManager } from '../config/logger';
 import { FlowIndexer } from '../indexing/flowIndexer';
 import { findReferenceAtPosition, FLOW_LANGUAGE_ID } from '../dsl/flowDsl';
 import { PatternManager } from '../config/patternManager';
+import { getWorkspaceRootPath, loadShortcuts } from '../utils/shortcutResolver';
 
 export class FlowCompletionItemProvider implements vscode.CompletionItemProvider {
 	constructor(private indexer: FlowIndexer) {}
@@ -44,6 +46,116 @@ export class FlowCompletionItemProvider implements vscode.CompletionItemProvider
 		LogManager.assert(!!position, 'FlowCompletionItemProvider.provideCompletionItems: position cannot be null');
 
 		const linePrefix = document.lineAt(position).text.substring(0, position.character);
+
+		// Check if we are typing a reference path inside quotes
+		const refMatch = linePrefix.match(/^\s*(?:#?reference|#?refer)\s+["']([^"']*)$/i);
+		if (refMatch) {
+			const typedPath = refMatch[1];
+			LogManager.log('FlowCompletionItemProvider: matching reference file auto-complete for typedPath:', typedPath);
+
+			const items: vscode.CompletionItem[] = [];
+			const root = getWorkspaceRootPath();
+			if (!root) {
+				return [];
+			}
+
+			// Determine which directory to scan and what is the typed prefix/filename
+			let searchDir = '';
+			let filterPrefix = '';
+
+			const shortcuts = loadShortcuts();
+
+			if (typedPath.startsWith('@')) {
+				// Check if they are just typing the shortcut name (e.g. "@" or "@inc")
+				if (!typedPath.includes('/') && !typedPath.includes('\\')) {
+					// Suggest shortcuts
+					for (const shortcutKey of Object.keys(shortcuts)) {
+						const item = new vscode.CompletionItem(shortcutKey, vscode.CompletionItemKind.Folder);
+						item.insertText = shortcutKey + '/';
+						item.detail = `Shortcut to: ${shortcuts[shortcutKey]}`;
+						items.push(item);
+					}
+					return items;
+				}
+
+				// Resolve the directory using shortcuts
+				let resolvedDir = '';
+				let remaining = '';
+				let matchedKey = '';
+				for (const key of Object.keys(shortcuts)) {
+					if (typedPath.startsWith(key + '/') || typedPath.startsWith(key + '\\')) {
+						matchedKey = key;
+						const replacement = shortcuts[key];
+						const resolvedBase = path.isAbsolute(replacement) ? replacement : path.resolve(root, replacement);
+						remaining = typedPath.substring(key.length + 1); // skip slash
+						resolvedDir = resolvedBase;
+						break;
+					}
+				}
+
+				if (!matchedKey) {
+					// Fallback to workspace root
+					remaining = typedPath.substring(1); // skip @
+					if (remaining.startsWith('/') || remaining.startsWith('\\')) {
+						remaining = remaining.substring(1);
+					}
+					resolvedDir = root;
+				}
+
+				// Find the folder and the typed part
+				const lastSlashIdx = Math.max(remaining.lastIndexOf('/'), remaining.lastIndexOf('\\'));
+				if (lastSlashIdx !== -1) {
+					const subFolder = remaining.substring(0, lastSlashIdx);
+					filterPrefix = remaining.substring(lastSlashIdx + 1);
+					searchDir = path.join(resolvedDir, subFolder);
+				} else {
+					filterPrefix = remaining;
+					searchDir = resolvedDir;
+				}
+			} else {
+				// Relative or workspace-relative path
+				const docDir = path.dirname(document.uri.fsPath);
+				const lastSlashIdx = Math.max(typedPath.lastIndexOf('/'), typedPath.lastIndexOf('\\'));
+				if (lastSlashIdx !== -1) {
+					const subFolder = typedPath.substring(0, lastSlashIdx);
+					filterPrefix = typedPath.substring(lastSlashIdx + 1);
+					searchDir = path.resolve(docDir, subFolder);
+				} else {
+					filterPrefix = typedPath;
+					searchDir = docDir;
+				}
+			}
+
+			// Scan the determined directory
+			try {
+				if (fs.existsSync(searchDir) && fs.statSync(searchDir).isDirectory()) {
+					const files = fs.readdirSync(searchDir);
+					for (const file of files) {
+						if (file === '.git' || file === 'node_modules' || file === '.planist') {
+							continue;
+						}
+						if (!file.toLowerCase().startsWith(filterPrefix.toLowerCase())) {
+							continue;
+						}
+						const fullPath = path.join(searchDir, file);
+						const isDir = fs.statSync(fullPath).isDirectory();
+						
+						const item = new vscode.CompletionItem(file, isDir ? vscode.CompletionItemKind.Folder : vscode.CompletionItemKind.File);
+						if (isDir) {
+							item.insertText = file + '/';
+							item.command = { command: 'editor.action.triggerSuggest', title: 'Re-trigger completions' };
+						} else {
+							item.insertText = file;
+						}
+						items.push(item);
+					}
+				}
+			} catch (e) {
+				LogManager.error('Error scanning dir for completions:', e);
+			}
+
+			return items;
+		}
 
 		// 1. 方法補全：例如 "-> Entity." 之後按點字元
 		const methodMatch = linePrefix.match(/->\s*([A-Za-z_][\w-]*)\.([A-Za-z_0-9-]*)$/);

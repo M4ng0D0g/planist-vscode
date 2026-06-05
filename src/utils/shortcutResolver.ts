@@ -21,6 +21,7 @@ export function loadShortcuts(): Record<string, string> {
 				fs.mkdirSync(configDir, { recursive: true });
 			}
 			const defaultShortcuts = {
+				"@": "./",
 				"@include": "./include"
 			};
 			fs.writeFileSync(filePath, JSON.stringify(defaultShortcuts, null, 4), 'utf8');

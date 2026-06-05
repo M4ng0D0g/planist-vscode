@@ -51,6 +51,7 @@ const DEFAULT_TOKENS_DARK: Record<string, string> = {
     comment: 'rgba(106, 153, 85, 1.0)',
     string: 'rgba(206, 145, 120, 1.0)',
     number: 'rgba(181, 206, 168, 1.0)',
+    macro: 'rgba(197, 134, 192, 1.0)',
 };
 
 const DEFAULT_TOKENS_LIGHT: Record<string, string> = {
@@ -61,6 +62,7 @@ const DEFAULT_TOKENS_LIGHT: Record<string, string> = {
     comment: 'rgba(0, 128, 0, 1.0)',
     string: 'rgba(163, 21, 21, 1.0)',
     number: 'rgba(9, 134, 115, 1.0)',
+    macro: 'rgba(175, 0, 219, 1.0)',
 };
 
 export class PlnKeywordHighlighter {
@@ -139,49 +141,10 @@ export class PlnKeywordHighlighter {
             isDarkTheme = activeTheme.kind === vscode.ColorThemeKind.Dark || activeTheme.kind === vscode.ColorThemeKind.HighContrast;
         }
 
-        // 1. 載入 keywords 顏色設定
-        const keywordsConfig = vscode.workspace.getConfiguration('planist.theme.keywords');
-        const kinds = ['class', 'abstract', 'interface', 'record', 'enum', 'text', 'bind', 'package', 'module'];
-
-        for (const kind of kinds) {
-            const inspect = keywordsConfig.inspect<string>(kind);
-            const isCustomized = inspect?.globalValue !== undefined || inspect?.workspaceValue !== undefined || inspect?.workspaceFolderValue !== undefined;
-            const color = isCustomized ? keywordsConfig.get<string>(kind) : (isDarkTheme ? DEFAULT_COLORS_DARK[kind] : DEFAULT_COLORS_LIGHT[kind]);
-            
-            if (color) {
-                const decType = vscode.window.createTextEditorDecorationType({
-                    color: color,
-                });
-                this.decorationTypes.set(kind, decType);
-            }
-        }
-
-        // 2. 載入 tokens 顏色設定
-        const tokensConfig = vscode.workspace.getConfiguration('planist.theme.tokens');
-        const tokenKeys = ['keyword', 'config', 'arrow', 'type', 'comment', 'string', 'number'];
-        for (const key of tokenKeys) {
-            const inspect = tokensConfig.inspect<string>(key);
-            const isCustomized = inspect?.globalValue !== undefined || inspect?.workspaceValue !== undefined || inspect?.workspaceFolderValue !== undefined;
-            const color = isCustomized ? tokensConfig.get<string>(key) : (isDarkTheme ? DEFAULT_TOKENS_DARK[key] : DEFAULT_TOKENS_LIGHT[key]);
-            
-            if (color) {
-                const style: vscode.DecorationRenderOptions = { color: color };
-                if (key === 'comment') {
-                    style.fontStyle = 'italic';
-                }
-                this.decorationTypes.set(key, vscode.window.createTextEditorDecorationType(style));
-            }
-        }
-
-        // 'modifier' 與 'keyword' 共用顏色
-        const keywordInspect = tokensConfig.inspect<string>('keyword');
-        const keywordIsCustomized = keywordInspect?.globalValue !== undefined || keywordInspect?.workspaceValue !== undefined || keywordInspect?.workspaceFolderValue !== undefined;
-        const keywordColor = keywordIsCustomized ? tokensConfig.get<string>('keyword') : (isDarkTheme ? DEFAULT_TOKENS_DARK['keyword'] : DEFAULT_TOKENS_LIGHT['keyword']);
-        if (keywordColor) {
-            this.decorationTypes.set('modifier', vscode.window.createTextEditorDecorationType({
-                color: keywordColor,
-            }));
-        }
+        // 僅設置 #schema flow 粗體高亮樣式
+        this.decorationTypes.set('schemaFlowHeader', vscode.window.createTextEditorDecorationType({
+            fontWeight: 'bold'
+        }));
     }
 
     /**
@@ -200,154 +163,26 @@ export class PlnKeywordHighlighter {
 
         const text = editor.document.getText();
         const lines = text.split(/\r?\n/);
+        const ranges: vscode.Range[] = [];
 
-        const ranges = new Map<string, vscode.Range[]>();
-        const allKeys = [
-            'class', 'abstract', 'interface', 'record', 'enum', 'text', 'bind', 'package', 'module',
-            'keyword', 'config', 'arrow', 'type', 'modifier', 'comment', 'string', 'number'
-        ];
-        for (const key of allKeys) {
-            ranges.set(key, []);
-        }
-
-        const modifiers = new Set([
-            'public', 'private', 'protected', 'static', 'readonly', 'abstract', 'async',
-            'override', 'virtual', 'final', 'const', 'variable', 'let', 'var', 'package',
-            'import', 'export', 'namespace', 'using'
-        ]);
-
-        const keywords = new Set([
-            'class', 'interface', 'if', 'else', 'return', 'for', 'while', 'do', 'switch', 'case', 'break',
-            'continue', 'new', 'throw', 'try', 'catch', 'finally', 'default'
-        ]);
-
-        const configKeys = new Set([
-            'bind', 'autoImport', 'style', 'color', 'borderColor', 'borderRadius', 'opacity'
-        ]);
-
-        const arrowKeys = new Set([
-            'extends', 'implements', 'inherits', 'associates', 'aggregates', 'composes', 'dependsOn'
-        ]);
-
-        const types = new Set([
-            'string', 'number', 'boolean', 'any', 'void', 'int', 'double', 'float',
-            'char', 'long', 'bool', 'Record', 'List', 'Map', 'object', 'null', 'undefined',
-            'true', 'false'
-        ]);
-
-        let entityKind = 'class';
-        const headerRegex = /^\s*(class|abstract|interface|record|enum|text|bind|package|module)\b/i;
-        for (const lineText of lines) {
-            const match = lineText.match(headerRegex);
-            if (match) {
-                entityKind = match[1].toLowerCase();
-                break;
+        const firstLine = lines[0];
+        if (firstLine) {
+            const schemaMatch = firstLine.match(/^\s*(#schema\s+flow)\b/i);
+            if (schemaMatch) {
+                const textToMatch = schemaMatch[1];
+                const startIdx = firstLine.indexOf(textToMatch);
+                if (startIdx !== -1) {
+                    ranges.push(new vscode.Range(
+                        new vscode.Position(0, startIdx),
+                        new vscode.Position(0, startIdx + textToMatch.length)
+                    ));
+                }
             }
         }
 
-        const headerRegexGlobal = /^\s*(class|abstract|interface|record|enum|text|bind|package|module)\b/gim;
-        const relKeywordRegex = /\b(inherits|implements|associates|aggregates|composes|dependsOn)\b/g;
-
-        lines.forEach((lineText, lineIndex) => {
-            let remainingText = lineText;
-
-            headerRegexGlobal.lastIndex = 0;
-            const m = headerRegexGlobal.exec(lineText);
-            if (m) {
-                const kind = m[1].toLowerCase();
-                const keywordIndex = lineText.indexOf(m[1]);
-                if (keywordIndex !== -1) {
-                    const startPos = new vscode.Position(lineIndex, keywordIndex);
-                    const endPos = new vscode.Position(lineIndex, keywordIndex + m[1].length);
-                    ranges.get(kind)?.push(new vscode.Range(startPos, endPos));
-                }
-            }
-
-            const commentIdx = lineText.indexOf('//');
-            relKeywordRegex.lastIndex = 0;
-            let match;
-            while ((match = relKeywordRegex.exec(lineText)) !== null) {
-                const keyword = match[1];
-                const keywordIndex = match.index;
-                if (commentIdx === -1 || keywordIndex < commentIdx) {
-                    const startPos = new vscode.Position(lineIndex, keywordIndex);
-                    const endPos = new vscode.Position(lineIndex, keywordIndex + keyword.length);
-                    ranges.get('arrow')?.push(new vscode.Range(startPos, endPos));
-                }
-            }
-
-            if (commentIdx !== -1) {
-                ranges.get('comment')?.push(new vscode.Range(
-                    new vscode.Position(lineIndex, commentIdx),
-                    new vscode.Position(lineIndex, lineText.length)
-                ));
-                remainingText = lineText.substring(0, commentIdx);
-            }
-
-            const stringRegex = /(["'])(?:(?=(\\?))\2.)*?\1/g;
-            let strMatch;
-            while ((strMatch = stringRegex.exec(remainingText)) !== null) {
-                ranges.get('string')?.push(new vscode.Range(
-                    new vscode.Position(lineIndex, strMatch.index),
-                    new vscode.Position(lineIndex, strMatch.index + strMatch[0].length)
-                ));
-            }
-
-            let textForWords = remainingText.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, (s) => ' '.repeat(s.length));
-
-            const numberRegex = /\b\d+(?:\.\d+)?\b/g;
-            let numMatch;
-            while ((numMatch = numberRegex.exec(textForWords)) !== null) {
-                ranges.get('number')?.push(new vscode.Range(
-                    new vscode.Position(lineIndex, numMatch.index),
-                    new vscode.Position(lineIndex, numMatch.index + numMatch[0].length)
-                ));
-            }
-
-            textForWords = textForWords.replace(/\b\d+(?:\.\d+)?\b/g, (s) => ' '.repeat(s.length));
-
-            const refDirectiveRegex = /(?:#?reference|#?refer)\b/g;
-            let refMatch;
-            while ((refMatch = refDirectiveRegex.exec(textForWords)) !== null) {
-                const startPos = new vscode.Position(lineIndex, refMatch.index);
-                const endPos = new vscode.Position(lineIndex, refMatch.index + refMatch[0].length);
-                ranges.get('config')?.push(new vscode.Range(startPos, endPos));
-            }
-            textForWords = textForWords.replace(/(?:#?reference|#?refer)\b/g, (s) => ' '.repeat(s.length));
-
-            const wordRegex = /\b[A-Za-z_][A-Za-z0-9_-]*\b/g;
-            let wordMatch;
-            while ((wordMatch = wordRegex.exec(textForWords)) !== null) {
-                const word = wordMatch[0];
-                const startIdx = wordMatch.index;
-                const range = new vscode.Range(
-                    new vscode.Position(lineIndex, startIdx),
-                    new vscode.Position(lineIndex, startIdx + word.length)
-                );
-
-                if (m && startIdx === lineText.indexOf(m[1])) {
-                    continue;
-                }
-
-                if (modifiers.has(word)) {
-                    ranges.get('modifier')?.push(range);
-                } else if (arrowKeys.has(word)) {
-                    ranges.get('arrow')?.push(range);
-                } else if (configKeys.has(word)) {
-                    ranges.get('config')?.push(range);
-                } else if (keywords.has(word)) {
-                    ranges.get('keyword')?.push(range);
-                } else if (types.has(word)) {
-                    ranges.get('type')?.push(range);
-                }
-            }
-        });
-
-        for (const [kind, rangesList] of ranges.entries()) {
-            const decType = this.decorationTypes.get(kind);
-            if (decType) {
-                editor.setDecorations(decType, rangesList);
-            }
+        const decType = this.decorationTypes.get('schemaFlowHeader');
+        if (decType) {
+            editor.setDecorations(decType, ranges);
         }
     }
 

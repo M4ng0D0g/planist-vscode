@@ -1,0 +1,336 @@
+import {
+	FlowFieldDefinition,
+	FlowMethodCall
+} from '../dsl/flowDsl';
+
+export interface DesignConfig {
+	[key: string]: string | number;
+}
+export interface DesignPanel {
+	name: string;
+	properties: { [key: string]: string | number };
+}
+export interface DesignSchemaData {
+	themeName: string;
+	config: DesignConfig;
+	panels: DesignPanel[];
+}
+
+export interface TaskItem {
+	text: string;
+	target?: string;
+}
+export interface TaskSchemaData {
+	boardName: string;
+	todo: TaskItem[];
+	in_progress: TaskItem[];
+	done: TaskItem[];
+}
+
+export interface ApiRoute {
+	method: string;
+	path: string;
+	request?: string;
+	response?: string;
+	handler?: string;
+}
+export interface ApiSchemaData {
+	apiName: string;
+	baseUrl: string;
+	routes: ApiRoute[];
+}
+
+export interface StateTransition {
+	event: string;
+	target: string;
+}
+export interface StateBlock {
+	name: string;
+	transitions: StateTransition[];
+}
+export interface StateSchemaData {
+	stateMachineName: string;
+	initialState: string;
+	states: StateBlock[];
+}
+
+export interface DbColumn {
+	name: string;
+	type: string;
+	constraints: string[];
+	fkTarget?: string;
+}
+export interface DbTable {
+	name: string;
+	columns: DbColumn[];
+}
+export interface DatabaseSchemaData {
+	dbName: string;
+	tables: DbTable[];
+}
+
+export function parseSchemaDocument(schema: string, text: string): any {
+	switch (schema.toLowerCase()) {
+		case 'design':
+			return parseDesignSchema(text);
+		case 'task':
+			return parseTaskSchema(text);
+		case 'api':
+			return parseApiSchema(text);
+		case 'state':
+			return parseStateSchema(text);
+		case 'database':
+			return parseDatabaseSchema(text);
+		default:
+			return {};
+	}
+}
+
+function parseDesignSchema(text: string): DesignSchemaData {
+	const lines = text.split(/\r?\n/);
+	let themeName = '';
+	const config: DesignConfig = {};
+	const panels: DesignPanel[] = [];
+
+	const schemaMatch = text.match(/^\s*#schema\s+design\s+([A-Za-z0-9_-]+)/i);
+	if (schemaMatch) {
+		themeName = schemaMatch[1];
+	}
+
+	let currentBlock: { type: 'config' | 'panel'; name?: string } | null = null;
+	let blockProperties: { [key: string]: string | number } = {};
+
+	for (const line of lines) {
+		const trimmed = line.trim();
+		if (trimmed.startsWith('//') || trimmed.startsWith('#schema') || !trimmed) {
+			continue;
+		}
+
+		if (trimmed.startsWith('config {')) {
+			currentBlock = { type: 'config' };
+			blockProperties = {};
+			continue;
+		}
+
+		const panelMatch = trimmed.match(/^panel\s+([A-Za-z0-9_-]+)\s*\{/i);
+		if (panelMatch) {
+			currentBlock = { type: 'panel', name: panelMatch[1] };
+			blockProperties = {};
+			continue;
+		}
+
+		if (trimmed === '}') {
+			if (currentBlock) {
+				if (currentBlock.type === 'config') {
+					Object.assign(config, blockProperties);
+				} else if (currentBlock.type === 'panel' && currentBlock.name) {
+					panels.push({
+						name: currentBlock.name,
+						properties: blockProperties
+					});
+				}
+				currentBlock = null;
+			}
+			continue;
+		}
+
+		if (currentBlock) {
+			const propMatch = trimmed.match(/^([A-Za-z0-9_-]+)\s*:\s*(.+)$/);
+			if (propMatch) {
+				const key = propMatch[1];
+				let valStr = propMatch[2].replace(/,$/, '').trim();
+				// Strip quotes if string
+				if (valStr.startsWith('"') && valStr.endsWith('"')) {
+					valStr = valStr.substring(1, valStr.length - 1);
+				}
+				// Parse number if applicable
+				const numVal = Number(valStr);
+				blockProperties[key] = isNaN(numVal) ? valStr : numVal;
+			}
+		}
+	}
+
+	return { themeName, config, panels };
+}
+
+function parseTaskSchema(text: string): TaskSchemaData {
+	let boardName = '';
+	const schemaMatch = text.match(/^\s*#schema\s+task\s+([A-Za-z0-9_-]+)/i);
+	if (schemaMatch) {
+		boardName = schemaMatch[1];
+	}
+
+	const todo: TaskItem[] = [];
+	const in_progress: TaskItem[] = [];
+	const done: TaskItem[] = [];
+
+	const parseList = (sectionName: string): TaskItem[] => {
+		const regex = new RegExp(`${sectionName}\\s*:\\s*\\[([^\\]]*)\\]`, 'is');
+		const match = text.match(regex);
+		if (!match) return [];
+		
+		const itemsText = match[1];
+		const lines = itemsText.split(/\r?\n/);
+		const result: TaskItem[] = [];
+		for (const line of lines) {
+			const trimmed = line.trim().replace(/^-\s*/, '').replace(/,$/, '').trim();
+			if (!trimmed) continue;
+			const linkMatch = trimmed.match(/^(.+?)\s*->\s*([A-Za-z0-9_\.]+)\s*$/);
+			if (linkMatch) {
+				result.push({
+					text: linkMatch[1].trim(),
+					target: linkMatch[2].trim()
+				});
+			} else {
+				result.push({
+					text: trimmed
+				});
+			}
+		}
+		return result;
+	};
+
+	return {
+		boardName,
+		todo: parseList('todo'),
+		in_progress: parseList('in_progress'),
+		done: parseList('done')
+	};
+}
+
+function parseApiSchema(text: string): ApiSchemaData {
+	let apiName = '';
+	const schemaMatch = text.match(/^\s*#schema\s+api\s+([A-Za-z0-9_-]+)/i);
+	if (schemaMatch) {
+		apiName = schemaMatch[1];
+	}
+
+	let baseUrl = '';
+	const baseUrlMatch = text.match(/baseUrl\s*:\s*["']?([^"'\r\n]+)["']?/i);
+	if (baseUrlMatch) {
+		baseUrl = baseUrlMatch[1];
+	}
+
+	const routes: ApiRoute[] = [];
+	const routeRegex = /(GET|POST|PUT|DELETE|PATCH)\s+([^\s{]+)\s*\{([^}]*)\}/gis;
+	let match;
+	while ((match = routeRegex.exec(text)) !== null) {
+		const method = match[1];
+		const path = match[2];
+		const body = match[3];
+
+		const route: ApiRoute = { method, path };
+		
+		const reqMatch = body.match(/request\s*:\s*({[^}]+})/s);
+		if (reqMatch) {
+			route.request = reqMatch[1].trim();
+		} else {
+			const reqLineMatch = body.match(/request\s*:\s*(.+)$/m);
+			if (reqLineMatch) route.request = reqLineMatch[1].trim();
+		}
+
+		const resMatch = body.match(/response\s*:\s*({[^}]+})/s);
+		if (resMatch) {
+			route.response = resMatch[1].trim();
+		} else {
+			const resLineMatch = body.match(/response\s*:\s*(.+)$/m);
+			if (resLineMatch) route.response = resLineMatch[1].trim();
+		}
+
+		const handlerMatch = body.match(/handler\s*:\s*->\s*([A-Za-z0-9_\.]+)/i);
+		if (handlerMatch) {
+			route.handler = handlerMatch[1].trim();
+		}
+
+		routes.push(route);
+	}
+
+	return { apiName, baseUrl, routes };
+}
+
+function parseStateSchema(text: string): StateSchemaData {
+	let stateMachineName = '';
+	const schemaMatch = text.match(/^\s*#schema\s+state\s+([A-Za-z0-9_-]+)/i);
+	if (schemaMatch) {
+		stateMachineName = schemaMatch[1];
+	}
+
+	let initialState = '';
+	const initialMatch = text.match(/initial\s*:\s*([A-Za-z0-9_-]+)/i);
+	if (initialMatch) {
+		initialState = initialMatch[1];
+	}
+
+	const states: StateBlock[] = [];
+	const stateRegex = /state\s+([A-Za-z0-9_-]+)\s*\{([^}]+)\}/gis;
+	let match;
+	while ((match = stateRegex.exec(text)) !== null) {
+		const name = match[1];
+		const body = match[2];
+		const transitions: StateTransition[] = [];
+
+		const lines = body.split(/\r?\n/);
+		for (const line of lines) {
+			const transitionMatch = line.match(/on\s+([A-Za-z0-9_-]+)\s*->\s*([A-Za-z0-9_-]+)/i);
+			if (transitionMatch) {
+				transitions.push({
+					event: transitionMatch[1],
+					target: transitionMatch[2]
+				});
+			}
+		}
+
+		states.push({ name, transitions });
+	}
+
+	return { stateMachineName, initialState, states };
+}
+
+function parseDatabaseSchema(text: string): DatabaseSchemaData {
+	let dbName = '';
+	const schemaMatch = text.match(/^\s*#schema\s+database\s+([A-Za-z0-9_-]+)/i);
+	if (schemaMatch) {
+		dbName = schemaMatch[1];
+	}
+
+	const tables: DbTable[] = [];
+	const tableRegex = /table\s+([A-Za-z0-9_-]+)\s*\{([^}]+)\}/gis;
+	let match;
+	while ((match = tableRegex.exec(text)) !== null) {
+		const name = match[1];
+		const body = match[2];
+		const columns: DbColumn[] = [];
+
+		const lines = body.split(/\r?\n/);
+		for (const line of lines) {
+			const trimmed = line.trim();
+			if (!trimmed || trimmed.startsWith('//')) continue;
+
+			const colMatch = trimmed.match(/^([A-Za-z0-9_-]+)\s*:\s*([A-Za-z0-9_\(\)]+)(?:\s*\[(.*)\])?/i);
+			if (colMatch) {
+				const colName = colMatch[1];
+				const colType = colMatch[2];
+				const rawConstraints = colMatch[3] || '';
+				
+				const constraints = rawConstraints.split(',').map(c => c.trim()).filter(Boolean);
+				let fkTarget: string | undefined;
+				
+				const fkMatch = rawConstraints.match(/fk\s*->\s*([A-Za-z0-9_\.]+)/i);
+				if (fkMatch) {
+					fkTarget = fkMatch[1];
+				}
+
+				columns.push({
+					name: colName,
+					type: colType,
+					constraints,
+					fkTarget
+				});
+			}
+		}
+
+		tables.push({ name, columns });
+	}
+
+	return { dbName, tables };
+}

@@ -35,7 +35,7 @@ import {
     togglePreviewMode,
     refreshPreview,
 	refreshCurrentPreview
-} from './preview/flowPreviewPanel';
+} from './preview/newFlowPreviewPanel';
 
 /**
  * 驗證開啟的文件是否為 Planist 的合法流程圖檔案
@@ -76,10 +76,10 @@ export async function activate(context: vscode.ExtensionContext) {
 		await togglePreviewMode();
 	});
 
-	// 3. 註冊 VS Code 智慧語言特徵提供者 (Completion, Hover, Definition, Semantic, Highlighter, Linter)
+	const flowDefProvider = new FlowDefinitionProvider(indexer);
 	const definitionProvider = vscode.languages.registerDefinitionProvider(
 		{ language: FLOW_LANGUAGE_ID, scheme: 'file' },
-		new FlowDefinitionProvider(indexer),
+		flowDefProvider,
 	);
 
 	const semanticProvider = new PlnSemanticTokensProvider();
@@ -92,7 +92,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	const highlighter = new PlnKeywordHighlighter();
 
 	const triggerChars = [
-		'>', '.', '-', ':', ' ', '+', '#',
+		'>', '.', '-', ':', ' ', '+', '#', '"', "'", '/', '@',
 		'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 		'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
 	];
@@ -168,6 +168,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		configureAppearance,
 		previewFlow,
 		switchViewMode,
+		flowDefProvider,
 		definitionProvider,
 		tokenProvider,
 		highlighter,

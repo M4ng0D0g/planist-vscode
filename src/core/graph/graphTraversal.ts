@@ -5,11 +5,12 @@ export interface MappedGraphEntity {
     name: string;
     kind: string;
     pattern?: string;
-    patternStyle: any;
+    patternStyle?: any;
     display?: any;
     contains?: string[];
     parent?: string;
-    methods: Array<{ name: string; parameters: any; callsTo: any[] }>;
+    fields: Array<{ name: string; type: string | null; accessModifier: string | null; line?: number; modifiers?: string[] }>;
+    methods: Array<{ name: string; parameters: any; callsTo: any[]; returnType?: string | null; accessModifier?: string | null; line?: number; modifiers?: string[] }>;
     references: any[];
     relationTargets: string[];
     extendsTargets: string[];
@@ -20,43 +21,53 @@ export interface MappedGraphEntity {
     composesTargets: string[];
     dependsOnTargets: string[];
     renderStyle: any;
+    entityName?: string;
+    methodName?: string;
+    modifiers?: string[];
+    accessModifier?: string | null;
+    returnType?: string | null;
 }
 
-export function findStartEntity(
+export function findStartEntities(
     allEntities: FlowGraphEntity[], 
     activeText: string | undefined, 
     activeUri: any, 
     indexer: FlowIndexer | undefined
-): FlowGraphEntity | undefined {
-    if (!activeUri || !indexer) return allEntities[0];
+): FlowGraphEntity[] {
+    if (!activeUri || !indexer) {
+        return allEntities[0] ? [allEntities[0]] : [];
+    }
 
-    const indexed = indexer.getEntityByUri(activeUri);
-    if (indexed) {
-        const entity = allEntities.find(e => e.name === indexed.entityName);
-        if (entity) return entity;
+    const indexedList = indexer.getEntitiesByUri(activeUri);
+    if (indexedList && indexedList.length > 0) {
+        const result: FlowGraphEntity[] = [];
+        for (const idx of indexedList) {
+            const entity = allEntities.find(e => e.name === idx.entityName);
+            if (entity) result.push(entity);
+        }
+        if (result.length > 0) return result;
     }
 
     if (activeText) {
-        const headerRegex = /^\s*(class|abstract|interface|record|enum|text|bind|package|module)\s+([A-Za-z_][\w-]*)\b/i;
-        const match = activeText.match(headerRegex);
-        if (match) {
-            const entity = allEntities.find(e => e.name === match[2]);
-            if (entity) return entity;
+        const headerRegex = /^\s*(class|abstract|interface|record|enum|text|bind|package|module)\s+([A-Za-z_][\w-]*)\b/gi;
+        let match;
+        const result: FlowGraphEntity[] = [];
+        while ((match = headerRegex.exec(activeText)) !== null) {
+            const name = match[2];
+            const entity = allEntities.find(e => e.name === name);
+            if (entity) result.push(entity);
         }
+        if (result.length > 0) return result;
     }
 
-    return allEntities[0];
+    return allEntities[0] ? [allEntities[0]] : [];
 }
 
 export function filterEntitiesByView(
     allEntities: FlowGraphEntity[], 
-    startEntity: FlowGraphEntity | undefined
+    startEntities: FlowGraphEntity[]
 ): FlowGraphEntity[] {
-    if (!startEntity) return [];
-
-    if (startEntity.kind === 'package' || startEntity.kind === 'module') {
-        return allEntities.filter(e => e.parent === startEntity.name || e.name === startEntity.name);
-    }
+    if (!startEntities || startEntities.length === 0) return [];
 
     const entityMap = new Map(allEntities.map(e => [e.name, e]));
     const visited = new Set<string>();
@@ -82,7 +93,9 @@ export function filterEntitiesByView(
         }
     }
 
-    traverse(startEntity.name);
+    for (const start of startEntities) {
+        traverse(start.name);
+    }
     return Array.from(reachableEntities.values());
 }
 
@@ -110,6 +123,7 @@ function getEntityAllTargets(entity: FlowGraphEntity): string[] {
     return Array.from(targets);
 }
 
+// @state: red
 export function mapGraphEntity(e: FlowGraphEntity, config: any, patterns: any): MappedGraphEntity {
     const patternStyle = e.pattern ? patterns[e.pattern]?.webview_style : undefined;
     return {
@@ -120,10 +134,21 @@ export function mapGraphEntity(e: FlowGraphEntity, config: any, patterns: any): 
         display: e.display,
         contains: e.contains,
         parent: e.parent,
+        fields: (e.fields || []).map((f: any) => ({
+            name: f.name,
+            type: f.type,
+            accessModifier: f.accessModifier,
+            line: f.line,
+            modifiers: f.modifiers || []
+        })),
         methods: (e.methods || []).map((m: any) => ({
             name: m.name,
             parameters: m.parameters,
-            callsTo: m.callsTo || []
+            callsTo: m.callsTo || [],
+            returnType: m.returnType,
+            accessModifier: m.accessModifier,
+            line: m.line,
+            modifiers: m.modifiers || []
         })),
         references: e.references || [],
         relationTargets: e.relationTargets || [],
@@ -136,4 +161,80 @@ export function mapGraphEntity(e: FlowGraphEntity, config: any, patterns: any): 
         dependsOnTargets: e.dependsOnTargets || [],
         renderStyle: {}
     };
+}
+
+export interface CallChainData {
+    nodes: MappedGraphEntity[];
+}
+
+// @state: red
+export function traverseCallChain(
+    allEntities: FlowGraphEntity[],
+    startEntityName: string,
+    startMethodName: string
+): CallChainData {
+    const nodes: MappedGraphEntity[] = [];
+    const visited = new Set<string>();
+
+    function getMethodInfo(entityName: string, methodName: string) {
+        const entity = allEntities.find(e => e.name === entityName);
+        if (!entity) return null;
+        const method = (entity.methods || []).find((m: any) => m.name === methodName);
+        return { entity, method };
+    }
+
+    function visit(entityName: string, methodName: string) {
+        const key = `${entityName}.${methodName}`;
+        if (visited.has(key)) return;
+        visited.add(key);
+
+        const info = getMethodInfo(entityName, methodName);
+        const accessModifier = info?.method?.accessModifier || null;
+        const modifiers = info?.method?.modifiers || [];
+        const returnType = info?.method?.returnType || null;
+
+        const relationTargets: string[] = [];
+
+        if (info?.method && Array.isArray(info.method.callsTo)) {
+            for (const call of info.method.callsTo) {
+                const targetEntity = call.targetName;
+                const targetMethod = call.targetMethodName || 'new';
+                const targetKey = `${targetEntity}.${targetMethod}`;
+                relationTargets.push(targetKey);
+            }
+        }
+
+        nodes.push({
+            name: key,
+            kind: 'method',
+            entityName,
+            methodName,
+            accessModifier,
+            modifiers,
+            returnType,
+            display: {},
+            references: [],
+            relationTargets,
+            extendsTargets: [],
+            implementsTargets: [],
+            inheritsTargets: [],
+            associatesTargets: [],
+            aggregatesTargets: [],
+            composesTargets: [],
+            dependsOnTargets: [],
+            renderStyle: {},
+            fields: [],
+            methods: []
+        });
+
+        if (info?.method && Array.isArray(info.method.callsTo)) {
+            for (const call of info.method.callsTo) {
+                visit(call.targetName, call.targetMethodName || 'new');
+            }
+        }
+    }
+
+    visit(startEntityName, startMethodName);
+
+    return { nodes };
 }

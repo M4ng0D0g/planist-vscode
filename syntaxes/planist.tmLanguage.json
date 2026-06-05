@@ -1,0 +1,181 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Planist Flow",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#directives"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#visibility"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#relations"
+    },
+    {
+      "include": "#styles"
+    },
+    {
+      "include": "#annotations"
+    },
+    {
+      "include": "#methods"
+    },
+    {
+      "include": "#fields"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.planist",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.planist",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "name": "keyword.control.directive.planist",
+          "match": "\\b(#reference|#refer|#schema)\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.planist",
+          "match": "\\b(class|abstract|interface|record|enum|text|bind|package|module|public|private|protected|static|final|const|variable|new|emit|if|else)\\b"
+        }
+      ]
+    },
+    "visibility": {
+      "patterns": [
+        {
+          "name": "keyword.control.planist",
+          "match": "(?<=^\\s*)(?:\\+|-(?!>)|#(?!reference|refer|schema))(?=\\s+|[A-Za-z_])"
+        }
+      ]
+    },
+    "relations": {
+      "patterns": [
+        {
+          "name": "keyword.operator.relation.planist",
+          "match": "->"
+        },
+        {
+          "name": "keyword.control.relation.planist",
+          "match": "\\b(extends|implements|inherits|associates|aggregates|composes|dependsOn)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.planist",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.planist",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.planist",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "styles": {
+      "patterns": [
+        {
+          "name": "support.type.property-name.planist",
+          "match": "\\b(color|borderColor|borderRadius|opacity|radius|display)\\b"
+        },
+        {
+          "name": "keyword.other.planist",
+          "match": "@style(?:\\.[a-zA-Z]+)?"
+        }
+      ]
+    },
+    "annotations": {
+      "patterns": [
+        {
+          "name": "variable.annotation.planist",
+          "match": "@[A-Za-z_][\\w-]*"
+        }
+      ]
+    },
+    "methods": {
+      "patterns": [
+        {
+          "match": "\\b([A-Za-z_][\\w-]*)\\s*\\(([^)]*)\\)\\s*(:)\\s*([A-Za-z0-9_<>\\s\\[\\]&*,.:]+)",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.planist"
+            },
+            "3": {
+              "name": "keyword.operator.colon.planist"
+            },
+            "4": {
+              "name": "entity.name.type.planist",
+              "patterns": [
+                {
+                  "match": "\\b(const)\\b",
+                  "name": "keyword.control.planist"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "fields": {
+      "patterns": [
+        {
+          "match": "\\b([A-Za-z_][\\w-]*)\\s*(:)\\s*([A-Za-z0-9_<>\\s\\[\\]&*,.:]+)(?=\\s*|$)",
+          "captures": {
+            "1": {
+              "name": "variable.other.property.planist"
+            },
+            "2": {
+              "name": "keyword.operator.colon.planist"
+            },
+            "3": {
+              "name": "entity.name.type.planist",
+              "patterns": [
+                {
+                  "match": "\\b(const)\\b",
+                  "name": "keyword.control.planist"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "scopeName": "source.pln"
+}
