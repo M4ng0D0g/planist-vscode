@@ -39,11 +39,6 @@
     ],
     "commands": [
       {
-        "command": "planist-vscode.previewFlow",
-        "title": "Preview Flow",
-        "category": "Flow Manager"
-      },
-      {
         "command": "planist-vscode.switchViewMode",
         "title": "Switch Flow View Mode",
         "category": "Flow Manager"
@@ -51,6 +46,16 @@
       {
         "command": "planist.configureAppearance",
         "title": "Configure Appearance",
+        "category": "Planist"
+      },
+      {
+        "command": "planist.createFlowFile",
+        "title": "Create Flow File",
+        "category": "Planist"
+      },
+      {
+        "command": "planist.createDocsFile",
+        "title": "Create Docs File",
         "category": "Planist"
       }
     ],
@@ -61,15 +66,6 @@
         "when": "editorTextFocus"
       }
     ],
-    "menus": {
-      "editor/title": [
-        {
-          "when": "resourceExtname == .pln || resourceExtname == .flow",
-          "command": "planist-vscode.previewFlow",
-          "group": "navigation"
-        }
-      ]
-    },
     "customEditors": [
       {
         "viewType": "planist.flowEditor",

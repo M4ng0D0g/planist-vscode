@@ -18,6 +18,8 @@
  */
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { LogManager } from '../config/logger';
 
 import {
@@ -29,6 +31,68 @@ import {
 } from '../config/planistConfig';
 
 export class CommandController {
+	// @state: yellow
+	public static async handleCreateFlowFile(): Promise<void> {
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		const defaultUri = workspaceFolders && workspaceFolders.length > 0 ? workspaceFolders[0].uri : undefined;
+
+		const fileUri = await vscode.window.showSaveDialog({
+			defaultUri: defaultUri ? vscode.Uri.joinPath(defaultUri, 'untitled.pln') : undefined,
+			filters: {
+				'Planist Flow File': ['pln']
+			},
+			title: '建立流程圖檔案'
+		});
+
+		if (!fileUri) {
+			return;
+		}
+
+		const baseName = path.basename(fileUri.fsPath, '.pln');
+		const safeName = baseName.replace(/[^a-zA-Z0-9_-]/g, '') || 'Untitled';
+
+		const template = `#schema flow ${safeName}\n\nclass NewEntity {\n}\n`;
+
+		try {
+			fs.writeFileSync(fileUri.fsPath, template, 'utf8');
+			const doc = await vscode.workspace.openTextDocument(fileUri);
+			await vscode.window.showTextDocument(doc);
+		} catch (err: any) {
+			vscode.window.showErrorMessage(`無法建立檔案: ${err?.message || err}`);
+		}
+	}
+
+	// @state: yellow
+	public static async handleCreateDocsFile(): Promise<void> {
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		const defaultUri = workspaceFolders && workspaceFolders.length > 0 ? workspaceFolders[0].uri : undefined;
+
+		const fileUri = await vscode.window.showSaveDialog({
+			defaultUri: defaultUri ? vscode.Uri.joinPath(defaultUri, 'untitled.pln') : undefined,
+			filters: {
+				'Planist Docs File': ['pln']
+			},
+			title: '建立文字文件檔案'
+		});
+
+		if (!fileUri) {
+			return;
+		}
+
+		const baseName = path.basename(fileUri.fsPath, '.pln');
+		const safeName = baseName.replace(/[^a-zA-Z0-9_-]/g, '') || 'Untitled';
+
+		const template = `#schema docs ${safeName}\n\npage "1. Introduction" outline\n---\n# Introduction\nWelcome to your new document!\n`;
+
+		try {
+			fs.writeFileSync(fileUri.fsPath, template, 'utf8');
+			const doc = await vscode.workspace.openTextDocument(fileUri);
+			await vscode.window.showTextDocument(doc);
+		} catch (err: any) {
+			vscode.window.showErrorMessage(`無法建立檔案: ${err?.message || err}`);
+		}
+	}
+
 	/**
 	 * 開啟互動式引導窗以逐項設定外觀樣式，配置完成後寫入 config.json
 	 */

@@ -437,11 +437,11 @@ export const NewFlowSchemaCSS = `
     }
 `;
 
-// @state: green
+// @state: red
 export class NewFlowSchemaRenderer implements ISchemaRenderer {
-    // @state: green
+    // @state: red
     public renderPage(webview: vscode.Webview, nonce: string) {
-        // @state: green
+        // @state: red
         return {
             render: (): string => {
                 const htmlParts: string[] = [];
@@ -462,7 +462,7 @@ export class NewFlowSchemaRenderer implements ISchemaRenderer {
                 
                 // Top Left Back Button Panel (Hidden by default, shown in Call Chain Mode)
                 htmlParts.push('    <div class="hud-panel hud-top-left" id="back-btn-panel" style="display: none;">');
-                htmlParts.push('        <button class="hud-btn primary" id="backBtn" style="width: auto; padding: 0 12px;" title="返回實體總覽">返回實體總覽</button>');
+                htmlParts.push('        <button class="hud-btn" id="backBtn" style="width: auto; padding: 0 12px;" title="返回實體總覽">返回實體總覽</button>');
                 htmlParts.push('    </div>');
  
                 // Infinite Viewport container
@@ -479,11 +479,6 @@ export class NewFlowSchemaRenderer implements ISchemaRenderer {
                 // Canvas Context Menu container
                 htmlParts.push('    <div id="canvas-context-menu" class="canvas-context-menu">');
                 htmlParts.push('        <div class="context-menu-item" id="ctx-create-node">建立實體節點</div>');
-                htmlParts.push('    </div>');
-                
-                // Bottom Left Fullscreen HUD Control
-                htmlParts.push('    <div class="hud-panel hud-bottom-left">');
-                htmlParts.push('        <button class="hud-btn" id="fullscreen-btn" title="切換全螢幕模式">⛶</button>');
                 htmlParts.push('    </div>');
                 
                 // Bottom Right Navigation HUD Controls

@@ -6,9 +6,10 @@ import { TaskSchemaRenderer } from './TaskSchemaRenderer';
 import { ApiSchemaRenderer } from './ApiSchemaRenderer';
 import { StateSchemaRenderer } from './StateSchemaRenderer';
 import { DatabaseSchemaRenderer } from './DatabaseSchemaRenderer';
+import { DocsSchemaRenderer } from './DocsSchemaRenderer';
 
 export class RendererFactory {
-	// @state: green
+	// @state: red
 	public static getRenderer(schema: string): ISchemaRenderer {
 		switch (schema.toLowerCase()) {
 			case 'flow':
@@ -23,6 +24,8 @@ export class RendererFactory {
 				return new StateSchemaRenderer();
 			case 'database':
 				return new DatabaseSchemaRenderer();
+			case 'docs':
+				return new DocsSchemaRenderer();
 			default:
 				// Fallback to new flow renderer for unknown schemas
 				return new NewFlowSchemaRenderer();

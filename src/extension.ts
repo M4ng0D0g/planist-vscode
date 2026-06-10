@@ -73,6 +73,14 @@ export async function activate(context: vscode.ExtensionContext) {
 		void CommandController.handleConfigureAppearance();
 	});
 
+	const createFlowFile = vscode.commands.registerCommand('planist.createFlowFile', () => {
+		void CommandController.handleCreateFlowFile();
+	});
+
+	const createDocsFile = vscode.commands.registerCommand('planist.createDocsFile', () => {
+		void CommandController.handleCreateDocsFile();
+	});
+
 	const previewFlow = vscode.commands.registerCommand('planist-vscode.previewFlow', async () => {
 		const panel = getOrCreatePreviewPanel(context, indexer);
 		panel.reveal(vscode.ViewColumn.Beside, true);
@@ -175,6 +183,8 @@ export async function activate(context: vscode.ExtensionContext) {
 		indexer,
 		customEditorRegistration,
 		configureAppearance,
+		createFlowFile,
+		createDocsFile,
 		previewFlow,
 		switchViewMode,
 		flowDefProvider,

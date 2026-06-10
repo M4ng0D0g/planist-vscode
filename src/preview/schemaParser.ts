@@ -69,6 +69,16 @@ export interface DatabaseSchemaData {
 	tables: DbTable[];
 }
 
+export interface DocPage {
+	title: string;
+	isOutline: boolean;
+	content: string;
+}
+export interface DocsSchemaData {
+	docName: string;
+	pages: DocPage[];
+}
+
 export function parseSchemaDocument(schema: string, text: string): any {
 	switch (schema.toLowerCase()) {
 		case 'design':
@@ -81,6 +91,8 @@ export function parseSchemaDocument(schema: string, text: string): any {
 			return parseStateSchema(text);
 		case 'database':
 			return parseDatabaseSchema(text);
+		case 'docs':
+			return parseDocsSchema(text);
 		default:
 			return {};
 	}
@@ -333,4 +345,64 @@ function parseDatabaseSchema(text: string): DatabaseSchemaData {
 	}
 
 	return { dbName, tables };
+}
+
+// @state: yellow
+export function parseDocsSchema(text: string): DocsSchemaData {
+	let docName = 'Untitled Document';
+	const schemaMatch = text.match(/^\s*#schema\s+docs\s+([A-Za-z0-9_-]+)/i);
+	if (schemaMatch) {
+		docName = schemaMatch[1];
+	}
+
+	const pageBlocks = text.split(/^\s*===\s*$/m);
+	const pages: DocPage[] = [];
+
+	for (const block of pageBlocks) {
+		const lines = block.split(/\r?\n/);
+		let title = '';
+		let isOutline = false;
+		const contentLines: string[] = [];
+		let foundContentSeparator = false;
+
+		for (const line of lines) {
+			const trimmed = line.trim();
+			if (trimmed.startsWith('#schema')) {
+				continue;
+			}
+
+			if (!foundContentSeparator) {
+				const pageMatch = trimmed.match(/^page\s+["']([^"']+)["'](?:\s+(outline))?/i);
+				if (pageMatch) {
+					title = pageMatch[1];
+					isOutline = !!pageMatch[2];
+					continue;
+				}
+				if (trimmed === '---') {
+					foundContentSeparator = true;
+					continue;
+				}
+				if (trimmed !== '') {
+					foundContentSeparator = true;
+					contentLines.push(line);
+				}
+			} else {
+				contentLines.push(line);
+			}
+		}
+
+		const content = contentLines.join('\n').trim();
+		if (title || content) {
+			if (!title) {
+				title = `Page ${pages.length + 1}`;
+			}
+			pages.push({
+				title,
+				isOutline,
+				content
+			});
+		}
+	}
+
+	return { docName, pages };
 }

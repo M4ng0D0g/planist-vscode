@@ -21,7 +21,7 @@
 | `src\preview\flowPreviewPanel.ts` | 🟡 Yellow (內部含未穩定函式) | 160 | `綠: 1 | 黃: 0 | 紅: 1` |
 | `src\preview\graphDataProvider.ts` | 🟢 Green | 113 | `綠: 1 | 黃: 0 | 紅: 0` |
 | `src\preview\newFlowPreviewPanel.ts` | 🟢 Green | ⚠️ **555** | `綠: 15 | 黃: 0 | 紅: 0` |
-| `src\preview\schemaParser.ts` | 🟡 Yellow (未標記) | ⚠️ **290** | `綠: 0 | 黃: 0 | 紅: 0` |
+| `src\preview\schemaParser.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **353** | `綠: 0 | 黃: 1 | 紅: 0` |
 | `src\preview\sync\SyncHub.ts` | 🟡 Yellow (未標記) | 47 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\components\PlanistBadge.ts` | 🟡 Yellow (未標記) | 13 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\components\PlanistButton.ts` | 🟡 Yellow (未標記) | 19 | `綠: 0 | 黃: 0 | 紅: 0` |
@@ -33,6 +33,7 @@
 | `src\preview\ui\schemas\ApiSchemaRenderer.ts` | 🟡 Yellow (未標記) | 155 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\schemas\DatabaseSchemaRenderer.ts` | 🟡 Yellow (未標記) | 170 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\schemas\DesignSchemaRenderer.ts` | 🟡 Yellow (未標記) | 182 | `綠: 0 | 黃: 0 | 紅: 0` |
+| `src\preview\ui\schemas\DocsSchemaJS.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **271** | `綠: 0 | 黃: 5 | 紅: 0` |
 | `src\preview\ui\schemas\FlowSchemaJS.ts` | 🟡 Yellow (未標記) | ⚠️ **392** | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\schemas\FlowSchemaRenderer.ts` | 🟡 Yellow (內部含未穩定函式) | 58 | `綠: 0 | 黃: 0 | 紅: 1` |
 | `src\preview\ui\schemas\NewFlowSchemaJS.ts` | 🟢 Green | ⚠️ **1098** | `綠: 20 | 黃: 0 | 紅: 0` |
@@ -50,7 +51,7 @@
 | `src\providers\highlighter.ts` | 🟡 Yellow (未標記) | 147 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\providers\hoverProvider.ts` | 🟡 Yellow (未標記) | 65 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\providers\linterProvider.ts` | 🟡 Yellow (未標記) | ⚠️ **244** | `綠: 0 | 黃: 0 | 紅: 0` |
-| `src\providers\PlanistEditorProvider.ts` | 🟢 Green | 153 | `綠: 8 | 黃: 0 | 紅: 0` |
+| `src\providers\PlanistEditorProvider.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **213** | `綠: 7 | 黃: 1 | 紅: 0` |
 | `src\providers\semanticProvider.ts` | 🟡 Yellow (未標記) | 54 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\test\extension.test.ts` | 🟡 Yellow (未標記) | 9 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\test\flowDsl.test.ts` | 🟡 Yellow (未標記) | ⚠️ **317** | `綠: 0 | 黃: 0 | 紅: 0` |
