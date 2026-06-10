@@ -17,17 +17,7 @@ import {
 export class CommandController {
 	// @state: yellow
 	public static async handleCreateFlowFile(): Promise<void> {
-		const workspaceFolders = vscode.workspace.workspaceFolders;
-		const defaultUri = workspaceFolders && workspaceFolders.length > 0 ? workspaceFolders[0].uri : undefined;
-
-		const fileUri = await vscode.window.showSaveDialog({
-			defaultUri: defaultUri ? vscode.Uri.joinPath(defaultUri, 'new-flow.pln') : undefined,
-			filters: {
-				'Planist Flow File': ['pln']
-			},
-			title: 'Create Flow File'
-		});
-
+		const fileUri = await promptPlanistFilePath('Create Flow File', 'new-flow.pln');
 		if (!fileUri) {
 			return;
 		}
@@ -52,6 +42,7 @@ class Done {
 `;
 
 		try {
+			fs.mkdirSync(path.dirname(fileUri.fsPath), { recursive: true });
 			fs.writeFileSync(fileUri.fsPath, template, 'utf8');
 			const doc = await vscode.workspace.openTextDocument(fileUri);
 			await vscode.window.showTextDocument(doc);
@@ -62,17 +53,7 @@ class Done {
 
 	// @state: yellow
 	public static async handleCreateDocsFile(): Promise<void> {
-		const workspaceFolders = vscode.workspace.workspaceFolders;
-		const defaultUri = workspaceFolders && workspaceFolders.length > 0 ? workspaceFolders[0].uri : undefined;
-
-		const fileUri = await vscode.window.showSaveDialog({
-			defaultUri: defaultUri ? vscode.Uri.joinPath(defaultUri, 'new-docs.pln') : undefined,
-			filters: {
-				'Planist Docs File': ['pln']
-			},
-			title: 'Create Docs File'
-		});
-
+		const fileUri = await promptPlanistFilePath('Create Docs File', 'new-docs.pln');
 		if (!fileUri) {
 			return;
 		}
@@ -100,6 +81,7 @@ Use the page separator above whenever you want a new Word-like page.
 `;
 
 		try {
+			fs.mkdirSync(path.dirname(fileUri.fsPath), { recursive: true });
 			fs.writeFileSync(fileUri.fsPath, template, 'utf8');
 			const doc = await vscode.workspace.openTextDocument(fileUri);
 			await vscode.window.showTextDocument(doc);
@@ -181,6 +163,84 @@ Use the page separator above whenever you want a new Word-like page.
 		await writePlanistConfig(nextConfig);
 		vscode.window.showInformationMessage('Planist appearance settings updated.');
 	}
+}
+
+// @state: yellow
+async function promptPlanistFilePath(title: string, defaultFileName: string): Promise<vscode.Uri | undefined> {
+	const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+	let rootUri: vscode.Uri | undefined;
+
+	if (workspaceFolders.length === 1) {
+		rootUri = workspaceFolders[0].uri;
+	} else if (workspaceFolders.length > 1) {
+		const selected = await vscode.window.showQuickPick(
+			workspaceFolders.map(folder => ({
+				label: folder.name,
+				description: folder.uri.fsPath,
+				uri: folder.uri,
+			})),
+			{
+				placeHolder: `${title}: choose a workspace folder`,
+			},
+		);
+		rootUri = selected?.uri;
+	}
+
+	const input = await vscode.window.showInputBox({
+		prompt: rootUri
+			? `${title}: enter a .pln path relative to ${path.basename(rootUri.fsPath)}`
+			: `${title}: enter an absolute .pln file path`,
+		value: defaultFileName,
+		placeHolder: rootUri ? `flows/${defaultFileName}` : `C:\\Projects\\${defaultFileName}`,
+		validateInput: value => validatePlanistFilePath(value, rootUri),
+	});
+
+	if (!input) {
+		return undefined;
+	}
+
+	const normalizedInput = ensurePlanistExtension(input.trim());
+	if (!rootUri) {
+		return vscode.Uri.file(path.resolve(normalizedInput));
+	}
+
+	return vscode.Uri.file(path.resolve(rootUri.fsPath, normalizedInput));
+}
+
+// @state: yellow
+function validatePlanistFilePath(value: string, rootUri: vscode.Uri | undefined): string | undefined {
+	const trimmed = value.trim();
+	if (!trimmed) {
+		return 'Enter a file path.';
+	}
+
+	if (/[<>:"|?*]/.test(trimmed.replace(/^[A-Za-z]:/, ''))) {
+		return 'The path contains characters that are not allowed in file names.';
+	}
+
+	const withExtension = ensurePlanistExtension(trimmed);
+	if (path.extname(withExtension).toLowerCase() !== '.pln') {
+		return 'Planist files must use the .pln extension.';
+	}
+
+	if (rootUri) {
+		if (path.isAbsolute(withExtension)) {
+			return 'Enter a path relative to the selected workspace folder.';
+		}
+
+		const resolved = path.resolve(rootUri.fsPath, withExtension);
+		const rootPath = path.resolve(rootUri.fsPath);
+		if (resolved !== rootPath && !resolved.startsWith(rootPath + path.sep)) {
+			return 'The path must stay inside the selected workspace folder.';
+		}
+	}
+
+	return undefined;
+}
+
+// @state: yellow
+function ensurePlanistExtension(filePath: string): string {
+	return path.extname(filePath) ? filePath : `${filePath}.pln`;
 }
 
 // @state: yellow
