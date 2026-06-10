@@ -1,12 +1,12 @@
 // @state: yellow
-export const DocsSchemaJS = `
+export const DocsSchemaJS = String.raw`
 (function() {
     const vscode = acquireVsCodeApi();
     let localPages = [];
-    let activeTab = 'dir'; // 'dir' or 'outline'
+    let activeTab = 'dir';
     let editingIndex = null;
+    let activePageIndex = 0;
 
-    // DOM Elements
     const docTitle = document.getElementById('doc-title');
     const tabDir = document.getElementById('tab-dir');
     const tabOutline = document.getElementById('tab-outline');
@@ -15,138 +15,200 @@ export const DocsSchemaJS = `
     const docsContainer = document.getElementById('document-scroll-container');
     const addPageBtn = document.getElementById('add-page-btn');
 
-    // Tab Event Listeners
-    tabDir.addEventListener('click', () => {
+    tabDir.addEventListener('click', function() {
         activeTab = 'dir';
         tabDir.classList.add('active');
         tabOutline.classList.remove('active');
         renderSidebar();
     });
 
-    tabOutline.addEventListener('click', () => {
+    tabOutline.addEventListener('click', function() {
         activeTab = 'outline';
         tabOutline.classList.add('active');
         tabDir.classList.remove('active');
         renderSidebar();
     });
 
-    // Add Page click
-    addPageBtn.addEventListener('click', () => {
+    addPageBtn.addEventListener('click', function() {
         vscode.postMessage({ command: 'addDocsPage' });
     });
 
-    // Handle VS Code messages
-    window.addEventListener('message', event => {
+    window.addEventListener('message', function(event) {
         const message = event.data;
         if (message.command === 'updateSchemaData' && message.schema === 'docs') {
             docTitle.textContent = message.data.docName || 'Untitled Document';
-            localPages = message.data.pages || [];
+            localPages = Array.isArray(message.data.pages) ? message.data.pages : [];
+            if (activePageIndex >= localPages.length) {
+                activePageIndex = Math.max(localPages.length - 1, 0);
+            }
             renderSidebar();
             renderPages();
         }
     });
 
     // @state: yellow
-    function parseInlineMarkdown(text) {
-        return text
+    function escapeHtml(value) {
+        return String(value || '')
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
-            .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
-            .replace(/\\*(.*?)\\*/g, '<em>$1</em>')
-            .replace(/__(.*?)__/g, '<strong>$1</strong>')
-            .replace(/_(.*?)_/g, '<em>$1</em>')
-            .replace(/\`(.*?)\`/g, '<code>$1</code>');
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // @state: yellow
+    function parseInlineMarkdown(text) {
+        return escapeHtml(text)
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/__(.+?)__/g, '<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g, '<em>$1</em>')
+            .replace(/_(.+?)_/g, '<em>$1</em>')
+            .replace(/\`(.+?)\`/g, '<code>$1</code>');
+    }
+
+    // @state: yellow
+    function closeOpenBlocks(state, html) {
+        if (state.inList) {
+            html.push('</ul>');
+            state.inList = false;
+        }
+        if (state.inOrderedList) {
+            html.push('</ol>');
+            state.inOrderedList = false;
+        }
+        if (state.inQuote) {
+            html.push('</blockquote>');
+            state.inQuote = false;
+        }
     }
 
     // @state: yellow
     function parseMarkdown(text) {
-        const lines = text.split('\\n');
+        const lines = String(text || '').split('\n');
         const html = [];
-        let inList = false;
-        let inQuote = false;
+        const state = {
+            inList: false,
+            inOrderedList: false,
+            inQuote: false
+        };
 
-        for (let line of lines) {
+        lines.forEach(function(line) {
             const trimmed = line.trim();
+            const unorderedMatch = line.match(/^\s*[-*]\s+(.*)$/);
+            const orderedMatch = line.match(/^\s*\d+[.)]\s+(.*)$/);
 
-            // Handle lists
-            const listMatch = line.match(/^(\\s*)(?:-|\\*)\\s+(.*)/);
-            if (listMatch) {
-                if (!inList) {
+            if (unorderedMatch) {
+                if (state.inOrderedList) {
+                    html.push('</ol>');
+                    state.inOrderedList = false;
+                }
+                if (!state.inList) {
                     html.push('<ul>');
-                    inList = true;
+                    state.inList = true;
                 }
-                html.push('<li>' + parseInlineMarkdown(listMatch[2]) + '</li>');
-                continue;
-            } else {
-                if (inList) {
+                html.push('<li>' + parseInlineMarkdown(unorderedMatch[1]) + '</li>');
+                return;
+            }
+
+            if (orderedMatch) {
+                if (state.inList) {
                     html.push('</ul>');
-                    inList = false;
+                    state.inList = false;
                 }
+                if (!state.inOrderedList) {
+                    html.push('<ol>');
+                    state.inOrderedList = true;
+                }
+                html.push('<li>' + parseInlineMarkdown(orderedMatch[1]) + '</li>');
+                return;
             }
 
-            // Handle blockquotes
+            if (state.inList || state.inOrderedList) {
+                if (state.inList) html.push('</ul>');
+                if (state.inOrderedList) html.push('</ol>');
+                state.inList = false;
+                state.inOrderedList = false;
+            }
+
             if (trimmed.startsWith('>')) {
-                if (!inQuote) {
+                if (!state.inQuote) {
                     html.push('<blockquote>');
-                    inQuote = true;
+                    state.inQuote = true;
                 }
-                html.push(parseInlineMarkdown(trimmed.substring(1).trim()) + '<br>');
-                continue;
-            } else {
-                if (inQuote) {
-                    html.push('</blockquote>');
-                    inQuote = false;
-                }
+                html.push('<p>' + parseInlineMarkdown(trimmed.substring(1).trim()) + '</p>');
+                return;
             }
 
-            // Headers
-            if (trimmed.startsWith('# ')) {
-                html.push('<h1>' + parseInlineMarkdown(trimmed.substring(2)) + '</h1>');
+            if (state.inQuote) {
+                html.push('</blockquote>');
+                state.inQuote = false;
+            }
+
+            if (trimmed.startsWith('### ')) {
+                html.push('<h3>' + parseInlineMarkdown(trimmed.substring(4)) + '</h3>');
             } else if (trimmed.startsWith('## ')) {
                 html.push('<h2>' + parseInlineMarkdown(trimmed.substring(3)) + '</h2>');
-            } else if (trimmed.startsWith('### ')) {
-                html.push('<h3>' + parseInlineMarkdown(trimmed.substring(4)) + '</h3>');
+            } else if (trimmed.startsWith('# ')) {
+                html.push('<h1>' + parseInlineMarkdown(trimmed.substring(2)) + '</h1>');
             } else if (trimmed === '') {
                 html.push('<p></p>');
             } else {
                 html.push('<p>' + parseInlineMarkdown(line) + '</p>');
             }
-        }
+        });
 
-        if (inList) html.push('</ul>');
-        if (inQuote) html.push('</blockquote>');
+        closeOpenBlocks(state, html);
+        return html.join('\n');
+    }
 
-        return html.join('\\n');
+    // @state: yellow
+    function visiblePageIndexes() {
+        return localPages
+            .map(function(page, idx) {
+                return { page: page, idx: idx };
+            })
+            .filter(function(entry) {
+                return activeTab !== 'outline' || entry.page.isOutline;
+            });
     }
 
     // @state: yellow
     function renderSidebar() {
         sidebarList.innerHTML = '';
-        localPages.forEach((page, idx) => {
-            if (activeTab === 'outline' && !page.isOutline) {
-                return;
-            }
+        const entries = visiblePageIndexes();
 
-            const item = document.createElement('div');
-            item.className = 'sidebar-item';
-            item.setAttribute('data-index', idx);
-            
+        if (entries.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'sidebar-empty';
+            empty.textContent = activeTab === 'outline' ? 'No outline pages' : 'No pages';
+            sidebarList.appendChild(empty);
+            return;
+        }
+
+        entries.forEach(function(entry) {
+            const page = entry.page;
+            const idx = entry.idx;
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'sidebar-item' + (idx === activePageIndex ? ' active' : '');
+            item.setAttribute('data-index', String(idx));
+
+            const pageNumber = document.createElement('span');
+            pageNumber.className = 'sidebar-page-number';
+            pageNumber.textContent = String(idx + 1);
+            item.appendChild(pageNumber);
+
             const titleSpan = document.createElement('span');
             titleSpan.className = 'sidebar-item-title';
-            titleSpan.textContent = page.title || \`Page \${idx + 1}\`;
+            titleSpan.textContent = page.title || 'Page ' + (idx + 1);
             item.appendChild(titleSpan);
 
-            // Bookmark/Outline toggle indicator in sidebar
-            const outlineIndicator = document.createElement('span');
-            outlineIndicator.className = 'sidebar-item-outline';
-            outlineIndicator.innerHTML = page.isOutline ? '★' : '☆';
-            outlineIndicator.style.fontSize = '12px';
-            outlineIndicator.style.cursor = 'pointer';
-            outlineIndicator.style.marginLeft = '8px';
-            outlineIndicator.style.color = page.isOutline ? '#eab308' : '#858585';
-            
-            outlineIndicator.addEventListener('click', (e) => {
+            const outlineIndicator = document.createElement('button');
+            outlineIndicator.type = 'button';
+            outlineIndicator.className = 'outline-toggle' + (page.isOutline ? ' active' : '');
+            outlineIndicator.title = page.isOutline ? 'Remove from outline' : 'Add to outline';
+            outlineIndicator.textContent = page.isOutline ? 'O' : '+';
+            outlineIndicator.addEventListener('click', function(e) {
                 e.stopPropagation();
                 vscode.postMessage({
                     command: 'updateDocsPage',
@@ -156,13 +218,8 @@ export const DocsSchemaJS = `
             });
             item.appendChild(outlineIndicator);
 
-            item.addEventListener('click', () => {
-                const sheet = document.getElementById(\`page-sheet-\${idx}\`);
-                if (sheet) {
-                    sheet.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
-                    item.classList.add('active');
-                }
+            item.addEventListener('click', function() {
+                scrollToPage(idx);
             });
 
             sidebarList.appendChild(item);
@@ -170,163 +227,172 @@ export const DocsSchemaJS = `
     }
 
     // @state: yellow
+    function scrollToPage(index) {
+        const sheet = document.getElementById('page-sheet-' + index);
+        if (sheet) {
+            activePageIndex = index;
+            sheet.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            renderSidebar();
+        }
+    }
+
+    // @state: yellow
     function renderPages() {
         docsContainer.innerHTML = '';
-        localPages.forEach((page, idx) => {
-            const sheet = document.createElement('div');
+
+        localPages.forEach(function(page, idx) {
+            const sheet = document.createElement('section');
             sheet.className = 'paper-page';
-            sheet.id = \`page-sheet-\${idx}\`;
+            sheet.id = 'page-sheet-' + idx;
+            sheet.setAttribute('data-index', String(idx));
 
-            // If we are currently editing this page, render the editor layout
             if (editingIndex === idx) {
-                const editWrapper = document.createElement('div');
-                editWrapper.style.display = 'flex';
-                editWrapper.style.flexDirection = 'column';
-                editWrapper.style.height = '100%';
-
-                const titleInput = document.createElement('input');
-                titleInput.type = 'text';
-                titleInput.className = 'editor-title-input';
-                titleInput.value = page.title;
-                titleInput.placeholder = '頁面標題 (Page Title)';
-                titleInput.style.fontSize = '18px';
-                titleInput.style.fontWeight = 'bold';
-                titleInput.style.marginBottom = '15px';
-                titleInput.style.padding = '8px';
-                titleInput.style.border = '1px solid #ccc';
-                titleInput.style.borderRadius = '4px';
-                editWrapper.appendChild(titleInput);
-
-                const textarea = document.createElement('textarea');
-                textarea.className = 'editor-textarea';
-                textarea.value = page.content;
-                textarea.placeholder = '在此使用 Markdown 格式撰寫文件內容...';
-                editWrapper.appendChild(textarea);
-
-                const actions = document.createElement('div');
-                actions.className = 'editor-actions';
-
-                const cancelBtn = document.createElement('button');
-                cancelBtn.className = 'editor-btn';
-                cancelBtn.textContent = '取消';
-                cancelBtn.addEventListener('click', () => {
-                    editingIndex = null;
-                    renderPages();
-                });
-
-                const saveBtn = document.createElement('button');
-                saveBtn.className = 'editor-btn save';
-                saveBtn.textContent = '保存變更';
-                saveBtn.addEventListener('click', () => {
-                    vscode.postMessage({
-                        command: 'updateDocsPage',
-                        pageIndex: idx,
-                        updates: {
-                            title: titleInput.value,
-                            content: textarea.value
-                        }
-                    });
-                    editingIndex = null;
-                });
-
-                actions.appendChild(cancelBtn);
-                actions.appendChild(saveBtn);
-                editWrapper.appendChild(actions);
-                sheet.appendChild(editWrapper);
+                renderEditor(sheet, page, idx);
             } else {
-                // Read-only Rendered Markdown layout
-                const hud = document.createElement('div');
-                hud.className = 'page-header-hud';
-
-                // Outline Toggle
-                const outlineBtn = document.createElement('button');
-                outlineBtn.className = 'hud-icon-btn';
-                outlineBtn.innerHTML = page.isOutline ? '★ 大綱' : '☆ 大綱';
-                outlineBtn.style.color = page.isOutline ? '#eab308' : '';
-                outlineBtn.title = '加到大綱';
-                outlineBtn.addEventListener('click', () => {
-                    vscode.postMessage({
-                        command: 'updateDocsPage',
-                        pageIndex: idx,
-                        updates: { isOutline: !page.isOutline }
-                    });
-                });
-                hud.appendChild(outlineBtn);
-
-                // Edit Button
-                const editBtn = document.createElement('button');
-                editBtn.className = 'hud-icon-btn';
-                editBtn.innerHTML = '✎ 編輯';
-                editBtn.title = '編輯頁面';
-                editBtn.addEventListener('click', () => {
-                    editingIndex = idx;
-                    renderPages();
-                });
-                hud.appendChild(editBtn);
-
-                // Delete Button
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'hud-icon-btn delete';
-                deleteBtn.innerHTML = '🗑 刪除';
-                deleteBtn.title = '刪除頁面';
-                deleteBtn.addEventListener('click', () => {
-                    if (confirm('確定要刪除此頁面嗎？')) {
-                        vscode.postMessage({
-                            command: 'deleteDocsPage',
-                            pageIndex: idx
-                        });
-                    }
-                });
-                hud.appendChild(deleteBtn);
-
-                sheet.appendChild(hud);
-
-                const body = document.createElement('div');
-                body.className = 'markdown-body';
-                body.innerHTML = parseMarkdown(page.content || '');
-                sheet.appendChild(body);
-
-                const pageNum = document.createElement('div');
-                pageNum.className = 'page-number-hud';
-                pageNum.textContent = idx + 1;
-                sheet.appendChild(pageNum);
+                renderPreview(sheet, page, idx);
             }
 
             docsContainer.appendChild(sheet);
         });
     }
 
-    // Scrollspy to highlight active page in sidebar
-    scrollContainer.addEventListener('scroll', () => {
+    // @state: yellow
+    function renderEditor(sheet, page, idx) {
+        const titleInput = document.createElement('input');
+        titleInput.type = 'text';
+        titleInput.className = 'editor-title-input';
+        titleInput.value = page.title || '';
+        titleInput.placeholder = 'Page title';
+        sheet.appendChild(titleInput);
+
+        const textarea = document.createElement('textarea');
+        textarea.className = 'editor-textarea';
+        textarea.value = page.content || '';
+        textarea.placeholder = 'Write Markdown';
+        sheet.appendChild(textarea);
+
+        const actions = document.createElement('div');
+        actions.className = 'editor-actions';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'editor-btn';
+        cancelBtn.type = 'button';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.addEventListener('click', function() {
+            editingIndex = null;
+            renderPages();
+        });
+
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'editor-btn save';
+        saveBtn.type = 'button';
+        saveBtn.textContent = 'Save';
+        saveBtn.addEventListener('click', function() {
+            vscode.postMessage({
+                command: 'updateDocsPage',
+                pageIndex: idx,
+                updates: {
+                    title: titleInput.value || 'Page ' + (idx + 1),
+                    content: textarea.value
+                }
+            });
+            editingIndex = null;
+        });
+
+        actions.appendChild(cancelBtn);
+        actions.appendChild(saveBtn);
+        sheet.appendChild(actions);
+    }
+
+    // @state: yellow
+    function renderPreview(sheet, page, idx) {
+        const hud = document.createElement('div');
+        hud.className = 'page-header-hud';
+
+        const outlineBtn = document.createElement('button');
+        outlineBtn.className = 'hud-icon-btn';
+        outlineBtn.type = 'button';
+        outlineBtn.textContent = page.isOutline ? 'Outline' : 'Add outline';
+        outlineBtn.title = page.isOutline ? 'Remove from outline' : 'Add to outline';
+        outlineBtn.addEventListener('click', function() {
+            vscode.postMessage({
+                command: 'updateDocsPage',
+                pageIndex: idx,
+                updates: { isOutline: !page.isOutline }
+            });
+        });
+        hud.appendChild(outlineBtn);
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'hud-icon-btn';
+        editBtn.type = 'button';
+        editBtn.textContent = 'Edit';
+        editBtn.title = 'Edit page';
+        editBtn.addEventListener('click', function() {
+            editingIndex = idx;
+            activePageIndex = idx;
+            renderSidebar();
+            renderPages();
+            scrollToPage(idx);
+        });
+        hud.appendChild(editBtn);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'hud-icon-btn delete';
+        deleteBtn.type = 'button';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.title = 'Delete page';
+        deleteBtn.addEventListener('click', function() {
+            if (confirm('Delete this page?')) {
+                vscode.postMessage({
+                    command: 'deleteDocsPage',
+                    pageIndex: idx
+                });
+            }
+        });
+        hud.appendChild(deleteBtn);
+        sheet.appendChild(hud);
+
+        const body = document.createElement('div');
+        body.className = 'markdown-body';
+        body.innerHTML = parseMarkdown(page.content || '');
+        sheet.appendChild(body);
+
+        const pageNum = document.createElement('div');
+        pageNum.className = 'page-number-hud';
+        pageNum.textContent = String(idx + 1);
+        sheet.appendChild(pageNum);
+    }
+
+    // @state: yellow
+    function syncActivePageFromScroll() {
         const sheets = Array.from(document.querySelectorAll('.paper-page'));
-        const viewportCenter = scrollContainer.scrollTop + scrollContainer.clientHeight / 2;
+        if (sheets.length === 0) {
+            activePageIndex = 0;
+            return;
+        }
 
-        let activeIdx = 0;
-        let minDiff = Infinity;
+        const viewportTop = scrollContainer.scrollTop;
+        const viewportCenter = viewportTop + scrollContainer.clientHeight * 0.35;
+        let bestIndex = 0;
+        let bestDistance = Infinity;
 
-        sheets.forEach((sheet, idx) => {
-            const sheetTop = sheet.offsetTop;
-            const sheetBottom = sheetTop + sheet.clientHeight;
-            const center = (sheetTop + sheetBottom) / 2;
-            const diff = Math.abs(viewportCenter - center);
-            if (diff < minDiff) {
-                minDiff = diff;
-                activeIdx = idx;
+        sheets.forEach(function(sheet) {
+            const idx = Number(sheet.getAttribute('data-index'));
+            const distance = Math.abs(sheet.offsetTop - viewportCenter);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = idx;
             }
         });
 
-        // Set active class in sidebar
-        document.querySelectorAll('.sidebar-item').forEach(item => {
-            const idx = parseInt(item.getAttribute('data-index'), 10);
-            if (idx === activeIdx) {
-                item.classList.add('active');
-            } else {
-                item.classList.remove('active');
-            }
-        });
-    });
+        if (bestIndex !== activePageIndex) {
+            activePageIndex = bestIndex;
+            renderSidebar();
+        }
+    }
 
-    // Notify ready
+    scrollContainer.addEventListener('scroll', syncActivePageFromScroll);
     vscode.postMessage({ command: 'ready' });
 })();
 `;
