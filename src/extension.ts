@@ -36,6 +36,7 @@ import {
     refreshPreview,
 	refreshCurrentPreview
 } from './preview/newFlowPreviewPanel';
+import { PlanistEditorProvider } from './providers/PlanistEditorProvider';
 
 /**
  * 驗證開啟的文件是否為 Planist 的合法流程圖檔案
@@ -60,6 +61,13 @@ export async function activate(context: vscode.ExtensionContext) {
 	// 1. 初始化全域記憶體語意索引器
 	const indexer = new FlowIndexer();
 	await indexer.initialize();
+
+	// 2. 註冊 Custom Editor Provider
+	const editorProvider = new PlanistEditorProvider(context, indexer);
+	const customEditorRegistration = vscode.window.registerCustomEditorProvider(
+		PlanistEditorProvider.viewType,
+		editorProvider
+	);
 
 	const configureAppearance = vscode.commands.registerCommand('planist.configureAppearance', () => {
 		void CommandController.handleConfigureAppearance();
@@ -165,6 +173,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	// 6. 將所有 Disposable 加入擴充生命週期管理
 	context.subscriptions.push(
 		indexer,
+		customEditorRegistration,
 		configureAppearance,
 		previewFlow,
 		switchViewMode,

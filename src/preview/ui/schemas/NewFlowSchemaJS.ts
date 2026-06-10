@@ -1,4 +1,4 @@
-// @state: red
+// @state: green
 export const NewFlowSchemaJS = `
 (function() {
     console.log('====== Planist New Infinite Board Core Activated ======');
@@ -22,7 +22,12 @@ export const NewFlowSchemaJS = `
     // Node layout positions cache
     let nodePositions = {};
     let activeEntities = [];
+    let configuredConnections = [];
+    let selectedEntityName = null;
     let connectionFrameId = null;
+    let lastSelectedKind = 'class';
+    let contextMenuX = 0;
+    let contextMenuY = 0;
 
     // DOM Elements
     let viewport = null;
@@ -39,7 +44,7 @@ export const NewFlowSchemaJS = `
         });
     }
 
-    // @state: red
+    // @state: green
     function formatAccessModifier(access) {
         if (!access) return '';
         const trimmed = access.trim().toLowerCase();
@@ -49,7 +54,7 @@ export const NewFlowSchemaJS = `
         return '';
     }
 
-    // @state: red
+    // @state: green
     function init() {
         viewport = document.getElementById('viewport');
         workspace = document.getElementById('workspace');
@@ -67,6 +72,9 @@ export const NewFlowSchemaJS = `
         window.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mouseup', handleMouseUp);
         viewport.addEventListener('wheel', handleWheel, { passive: false });
+        viewport.addEventListener('contextmenu', handleContextMenu);
+        viewport.addEventListener('wheel', () => hideContextMenu(), { passive: true });
+        viewport.addEventListener('mousedown', () => hideContextMenu());
 
         // HUD Controls
         document.getElementById('zoom-in-btn')?.addEventListener('click', () => adjustZoom(1.2));
@@ -79,11 +87,126 @@ export const NewFlowSchemaJS = `
             vscode.postMessage({ command: 'toggleFullscreen' });
         });
 
+        // Deselection listener on viewport background
+        viewport.addEventListener('mousedown', (e) => {
+            if (e.target === viewport || e.target === gridBg || e.target.id === 'workspace') {
+                document.querySelectorAll('.board-node').forEach(n => n.classList.remove('selected'));
+                selectedEntityName = null;
+                document.dispatchEvent(new CustomEvent('planist-node-deselected'));
+            }
+        });
+
+        // [修正註解] 透過監聽自訂 DOM 事件，讓 decoupled 的 Settings 面板能與後端通訊，
+        // 避免 Settings 腳本需要重複 acquireVsCodeApi() 或引用未宣告的 vscode 導致 ReferenceError。
+        document.addEventListener('planist-update-entity', (e) => {
+            if (e.detail && e.detail.data && e.detail.data.kind) {
+                lastSelectedKind = e.detail.data.kind;
+            }
+            vscode.postMessage({
+                command: 'updateEntity',
+                originalName: e.detail.originalName,
+                data: e.detail.data
+            });
+        });
+
+        document.addEventListener('planist-update-entity-color', (e) => {
+            vscode.postMessage({
+                command: 'updateEntityColor',
+                entityName: e.detail.entityName,
+                color: e.detail.color
+            });
+        });
+
+        document.addEventListener('planist-update-entity-position', (e) => {
+            vscode.postMessage({
+                command: 'updateEntityPosition',
+                entityName: e.detail.entityName,
+                position: e.detail.position
+            });
+        });
+
+        document.addEventListener('planist-update-connection', (e) => {
+            vscode.postMessage({
+                command: 'updateConnection',
+                connection: e.detail
+            });
+        });
+
+        document.addEventListener('planist-update-multiple-connections', (e) => {
+            vscode.postMessage({
+                command: 'updateMultipleConnections',
+                connections: e.detail.connections
+            });
+        });
+
+        document.addEventListener('planist-node-selected', (e) => {
+            if (e.detail && e.detail.entity && e.detail.entity.kind) {
+                lastSelectedKind = e.detail.entity.kind;
+            }
+        });
+
+        document.getElementById('ctx-create-node')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            hideContextMenu();
+            vscode.postMessage({
+                command: 'createEntityPrompt',
+                x: contextMenuX,
+                y: contextMenuY,
+                lastSelectedKind: lastSelectedKind
+            });
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            const menu = document.getElementById('canvas-context-menu');
+            if (menu && !menu.contains(e.target)) {
+                hideContextMenu();
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
+                e.preventDefault();
+                triggerResetConnectionLayoutForSelected();
+            }
+        });
+
         // Set initial state
         updateTransform();
         
         // Notify VS Code that webview is ready
         vscode.postMessage({ command: 'ready' });
+    }
+
+    // @state: green
+    function handleContextMenu(e) {
+        if (e.target === viewport || e.target === gridBg || e.target.id === 'workspace') {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const clientX = e.clientX;
+            const clientY = e.clientY;
+
+            // Convert click position to canvas coordinates
+            contextMenuX = (clientX - panX) / zoom;
+            contextMenuY = (clientY - panY) / zoom;
+
+            const menu = document.getElementById('canvas-context-menu');
+            if (menu) {
+                menu.style.left = clientX + 'px';
+                menu.style.top = clientY + 'px';
+                menu.classList.add('open');
+            }
+        } else {
+            hideContextMenu();
+        }
+    }
+
+    // @state: green
+    function hideContextMenu() {
+        const menu = document.getElementById('canvas-context-menu');
+        if (menu) {
+            menu.classList.remove('open');
+        }
     }
 
     // @state: green
@@ -260,6 +383,68 @@ export const NewFlowSchemaJS = `
         }
     }
 
+    function isVerticalSegmentSafe(x, y1, y2, excludeNodes, nodes) {
+        const minY = Math.min(y1, y2);
+        const maxY = Math.max(y1, y2);
+        for (const n of nodes) {
+            if (excludeNodes.includes(n.name)) continue;
+            const shrink = 2.0;
+            if (x > n.left + shrink && x < n.right - shrink) {
+                if (maxY > n.top + shrink && minY < n.bottom - shrink) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    function isHorizontalSegmentSafe(y, x1, x2, excludeNodes, nodes) {
+        const minX = Math.min(x1, x2);
+        const maxX = Math.max(x1, x2);
+        for (const n of nodes) {
+            if (excludeNodes.includes(n.name)) continue;
+            const shrink = 2.0;
+            if (y > n.top + shrink && y < n.bottom - shrink) {
+                if (maxX > n.left + shrink && minX < n.right - shrink) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    function findSafeMidX(sX, minTargetX, minY, maxY, excludeNodes, nodes) {
+        const candidateX = sX + (minTargetX - sX) / 2;
+        if (isVerticalSegmentSafe(candidateX, minY, maxY, excludeNodes, nodes)) {
+            return candidateX;
+        }
+        const x1 = sX + 20;
+        if (x1 < minTargetX && isVerticalSegmentSafe(x1, minY, maxY, excludeNodes, nodes)) {
+            return x1;
+        }
+        const x2 = minTargetX - 20;
+        if (x2 > sX && isVerticalSegmentSafe(x2, minY, maxY, excludeNodes, nodes)) {
+            return x2;
+        }
+        return candidateX;
+    }
+
+    function findSafeMidY(sY, minTargetY, minX, maxX, excludeNodes, nodes) {
+        const candidateY = sY + (minTargetY - sY) / 2;
+        if (isHorizontalSegmentSafe(candidateY, minX, maxX, excludeNodes, nodes)) {
+            return candidateY;
+        }
+        const y1 = sY + 20;
+        if (y1 < minTargetY && isHorizontalSegmentSafe(y1, minX, maxX, excludeNodes, nodes)) {
+            return y1;
+        }
+        const y2 = minTargetY - 20;
+        if (y2 > sY && isHorizontalSegmentSafe(y2, minX, maxX, excludeNodes, nodes)) {
+            return y2;
+        }
+        return candidateY;
+    }
+
     // @state: green
     function renderConnections() {
         if (!workspace) return;
@@ -271,9 +456,11 @@ export const NewFlowSchemaJS = `
             workspace.insertBefore(svg, workspace.firstChild);
         }
         
-        // Remove existing paths (leave defs intact)
+        // Remove existing paths and handles
         const paths = svg.querySelectorAll('path:not([id]):not(defs path)');
         paths.forEach(p => p.remove());
+        const handles = svg.querySelectorAll('.connection-handle');
+        handles.forEach(h => h.remove());
         
         // Ensure defs exists
         let defs = svg.querySelector('defs');
@@ -345,77 +532,21 @@ export const NewFlowSchemaJS = `
                 const targets = entity[rel.key] || [];
                 targets.forEach(targetName => {
                     if (nodePositions[targetName]) {
+                        const match = configuredConnections.find(c => c.from === entity.name && c.to === targetName && c.relationType === rel.type);
                         connections.push({
                             from: entity.name,
                             to: targetName,
-                            relationType: rel.type
+                            relationType: rel.type,
+                            direction: match ? match.direction : null,
+                            midX: match ? match.midX : null,
+                            midY: match ? match.midY : null
                         });
                     }
                 });
             });
         });
 
-        function isVerticalSegmentSafe(x, y1, y2, excludeNodes) {
-            const minY = Math.min(y1, y2);
-            const maxY = Math.max(y1, y2);
-            for (const n of nodes) {
-                if (excludeNodes.includes(n.name)) continue;
-                const shrink = 2.0;
-                if (x > n.left + shrink && x < n.right - shrink) {
-                    if (maxY > n.top + shrink && minY < n.bottom - shrink) {
-                        return false;
-                    }
-                }
-            }
-            return true;
-        }
 
-        function isHorizontalSegmentSafe(y, x1, x2, excludeNodes) {
-            const minX = Math.min(x1, x2);
-            const maxX = Math.max(x1, x2);
-            for (const n of nodes) {
-                if (excludeNodes.includes(n.name)) continue;
-                const shrink = 2.0;
-                if (y > n.top + shrink && y < n.bottom - shrink) {
-                    if (maxX > n.left + shrink && minX < n.right - shrink) {
-                        return false;
-                    }
-                }
-            }
-            return true;
-        }
-
-        function findSafeMidX(sX, minTargetX, minY, maxY, excludeNodes) {
-            const candidateX = sX + (minTargetX - sX) / 2;
-            if (isVerticalSegmentSafe(candidateX, minY, maxY, excludeNodes)) {
-                return candidateX;
-            }
-            const x1 = sX + 20;
-            if (x1 < minTargetX && isVerticalSegmentSafe(x1, minY, maxY, excludeNodes)) {
-                return x1;
-            }
-            const x2 = minTargetX - 20;
-            if (x2 > sX && isVerticalSegmentSafe(x2, minY, maxY, excludeNodes)) {
-                return x2;
-            }
-            return candidateX;
-        }
-
-        function findSafeMidY(sY, minTargetY, minX, maxX, excludeNodes) {
-            const candidateY = sY + (minTargetY - sY) / 2;
-            if (isHorizontalSegmentSafe(candidateY, minX, maxX, excludeNodes)) {
-                return candidateY;
-            }
-            const y1 = sY + 20;
-            if (y1 < minTargetY && isHorizontalSegmentSafe(y1, minX, maxX, excludeNodes)) {
-                return y1;
-            }
-            const y2 = minTargetY - 20;
-            if (y2 > sY && isHorizontalSegmentSafe(y2, minX, maxX, excludeNodes)) {
-                return y2;
-            }
-            return candidateY;
-        }
 
         // Group connections by source node and classified direction
         const groups = {};
@@ -424,14 +555,15 @@ export const NewFlowSchemaJS = `
             const toNode = nodes.find(n => n.name === conn.to);
             if (!fromNode || !toNode) return;
 
-            const dx = toNode.midX - fromNode.midX;
-            const dy = toNode.midY - fromNode.midY;
-            
-            let dir = 'East';
-            if (Math.abs(dx) >= Math.abs(dy)) {
-                dir = dx > 0 ? 'East' : 'West';
-            } else {
-                dir = dy > 0 ? 'South' : 'North';
+            let dir = conn.direction;
+            if (!dir) {
+                const dx = toNode.midX - fromNode.midX;
+                const dy = toNode.midY - fromNode.midY;
+                if (Math.abs(dx) >= Math.abs(dy)) {
+                    dir = dx > 0 ? 'East' : 'West';
+                } else {
+                    dir = dy > 0 ? 'South' : 'North';
+                }
             }
 
             const groupKey = conn.from + '->' + dir;
@@ -468,15 +600,17 @@ export const NewFlowSchemaJS = `
                 const targetLimitX = Math.max(minTargetLeft, sPort.x + 30);
                 const minY = Math.min(sPort.y, ...targets.map(t => t.tPort.y));
                 const maxY = Math.max(sPort.y, ...targets.map(t => t.tPort.y));
-                
-                const midX = findSafeMidX(sPort.x, targetLimitX, minY, maxY, excludeNodeNames);
 
                 targets.forEach(t => {
+                    let finalMidX = t.conn.midX;
+                    if (finalMidX === undefined || finalMidX === null) {
+                        finalMidX = findSafeMidX(sPort.x, targetLimitX, minY, maxY, excludeNodeNames, nodes);
+                    }
                     const pathD = 'M ' + sPort.x + ' ' + sPort.y +
-                                  ' L ' + midX + ' ' + sPort.y +
-                                  ' L ' + midX + ' ' + t.tPort.y +
+                                  ' L ' + finalMidX + ' ' + sPort.y +
+                                  ' L ' + finalMidX + ' ' + t.tPort.y +
                                   ' L ' + t.tPort.x + ' ' + t.tPort.y;
-                    drawPath(pathD, t.conn);
+                    drawPath(pathD, t.conn, dir, sPort, t.tPort, finalMidX, null);
                 });
 
             } else if (dir === 'West') {
@@ -493,14 +627,16 @@ export const NewFlowSchemaJS = `
                 const minY = Math.min(sPort.y, ...targets.map(t => t.tPort.y));
                 const maxY = Math.max(sPort.y, ...targets.map(t => t.tPort.y));
 
-                const midX = findSafeMidX(targetLimitX, sPort.x, minY, maxY, excludeNodeNames);
-
                 targets.forEach(t => {
+                    let finalMidX = t.conn.midX;
+                    if (finalMidX === undefined || finalMidX === null) {
+                        finalMidX = findSafeMidX(targetLimitX, sPort.x, minY, maxY, excludeNodeNames, nodes);
+                    }
                     const pathD = 'M ' + sPort.x + ' ' + sPort.y +
-                                  ' L ' + midX + ' ' + sPort.y +
-                                  ' L ' + midX + ' ' + t.tPort.y +
+                                  ' L ' + finalMidX + ' ' + sPort.y +
+                                  ' L ' + finalMidX + ' ' + t.tPort.y +
                                   ' L ' + t.tPort.x + ' ' + t.tPort.y;
-                    drawPath(pathD, t.conn);
+                    drawPath(pathD, t.conn, dir, sPort, t.tPort, finalMidX, null);
                 });
 
             } else if (dir === 'South') {
@@ -517,14 +653,16 @@ export const NewFlowSchemaJS = `
                 const minX = Math.min(sPort.x, ...targets.map(t => t.tPort.x));
                 const maxX = Math.max(sPort.x, ...targets.map(t => t.tPort.x));
 
-                const midY = findSafeMidY(sPort.y, targetLimitY, minX, maxX, excludeNodeNames);
-
                 targets.forEach(t => {
+                    let finalMidY = t.conn.midY;
+                    if (finalMidY === undefined || finalMidY === null) {
+                        finalMidY = findSafeMidY(sPort.y, targetLimitY, minX, maxX, excludeNodeNames, nodes);
+                    }
                     const pathD = 'M ' + sPort.x + ' ' + sPort.y +
-                                  ' L ' + sPort.x + ' ' + midY +
-                                  ' L ' + t.tPort.x + ' ' + midY +
+                                  ' L ' + sPort.x + ' ' + finalMidY +
+                                  ' L ' + t.tPort.x + ' ' + finalMidY +
                                   ' L ' + t.tPort.x + ' ' + t.tPort.y;
-                    drawPath(pathD, t.conn);
+                    drawPath(pathD, t.conn, dir, sPort, t.tPort, null, finalMidY);
                 });
 
             } else if (dir === 'North') {
@@ -541,19 +679,21 @@ export const NewFlowSchemaJS = `
                 const minX = Math.min(sPort.x, ...targets.map(t => t.tPort.x));
                 const maxX = Math.max(sPort.x, ...targets.map(t => t.tPort.x));
 
-                const midY = findSafeMidY(targetLimitY, sPort.y, minX, maxX, excludeNodeNames);
-
                 targets.forEach(t => {
+                    let finalMidY = t.conn.midY;
+                    if (finalMidY === undefined || finalMidY === null) {
+                        finalMidY = findSafeMidY(targetLimitY, sPort.y, minX, maxX, excludeNodeNames, nodes);
+                    }
                     const pathD = 'M ' + sPort.x + ' ' + sPort.y +
-                                  ' L ' + sPort.x + ' ' + midY +
-                                  ' L ' + t.tPort.x + ' ' + midY +
+                                  ' L ' + sPort.x + ' ' + finalMidY +
+                                  ' L ' + t.tPort.x + ' ' + finalMidY +
                                   ' L ' + t.tPort.x + ' ' + t.tPort.y;
-                    drawPath(pathD, t.conn);
+                    drawPath(pathD, t.conn, dir, sPort, t.tPort, null, finalMidY);
                 });
             }
         });
 
-        function drawPath(d, conn) {
+        function drawPath(d, conn, actualDir, sPort, tPort, finalMidX, finalMidY) {
             const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             pathEl.setAttribute('d', d);
             pathEl.setAttribute('fill', 'none');
@@ -584,10 +724,320 @@ export const NewFlowSchemaJS = `
             }
 
             svg.appendChild(pathEl);
+
+            // Transparent helper path for hover/drag
+            const touchPathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            touchPathEl.setAttribute('d', d);
+            touchPathEl.setAttribute('fill', 'none');
+            touchPathEl.setAttribute('stroke', 'transparent');
+            touchPathEl.setAttribute('stroke-width', '10');
+            touchPathEl.setAttribute('style', 'cursor: pointer;');
+            svg.appendChild(touchPathEl);
+
+            // 1. Port handle (at source port)
+            const portHandle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            portHandle.setAttribute('cx', sPort.x);
+            portHandle.setAttribute('cy', sPort.y);
+            portHandle.setAttribute('r', '5');
+            portHandle.setAttribute('class', 'connection-handle port-handle');
+            portHandle.setAttribute('style', 'cursor: crosshair; fill: #fff; stroke: var(--connection-color); stroke-width: 1.5px; opacity: 0.4; transition: opacity 0.2s, r 0.2s;');
+
+            // 2. Mid handle (at midpoint of the middle segment)
+            let midHandleX = 0;
+            let midHandleY = 0;
+            if (actualDir === 'East' || actualDir === 'West') {
+                midHandleX = finalMidX;
+                midHandleY = (sPort.y + tPort.y) / 2;
+            } else {
+                midHandleX = (sPort.x + tPort.x) / 2;
+                midHandleY = finalMidY;
+            }
+
+            const midHandle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            midHandle.setAttribute('cx', midHandleX);
+            midHandle.setAttribute('cy', midHandleY);
+            midHandle.setAttribute('r', '5');
+            midHandle.setAttribute('class', 'connection-handle mid-handle');
+            midHandle.setAttribute('style', 'cursor: move; fill: #fff; stroke: var(--connection-color); stroke-width: 1.5px; opacity: 0.4; transition: opacity 0.2s, r 0.2s;');
+
+            [portHandle, midHandle].forEach(h => {
+                h.addEventListener('mouseenter', () => {
+                    h.setAttribute('opacity', '1.0');
+                    h.setAttribute('r', '7');
+                });
+                h.addEventListener('mouseleave', () => {
+                    h.setAttribute('opacity', '0.4');
+                    h.setAttribute('r', '5');
+                });
+            });
+
+            // Handle Mid-handle dragging
+            midHandle.addEventListener('mousedown', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+
+                const startDragX = e.clientX;
+                const startDragY = e.clientY;
+                const initialMidX = finalMidX;
+                const initialMidY = finalMidY;
+                let hasMoved = false;
+
+                function onMouseMove(moveEvt) {
+                    const dx = (moveEvt.clientX - startDragX) / zoom;
+                    const dy = (moveEvt.clientY - startDragY) / zoom;
+                    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+                        hasMoved = true;
+                    }
+
+                    let newMidX = initialMidX;
+                    let newMidY = initialMidY;
+
+                    if (actualDir === 'East' || actualDir === 'West') {
+                        newMidX = initialMidX + dx;
+                        midHandle.setAttribute('cx', newMidX);
+                        const pathD = 'M ' + sPort.x + ' ' + sPort.y +
+                                      ' L ' + newMidX + ' ' + sPort.y +
+                                      ' L ' + newMidX + ' ' + tPort.y +
+                                      ' L ' + tPort.x + ' ' + tPort.y;
+                        pathEl.setAttribute('d', pathD);
+                        touchPathEl.setAttribute('d', pathD);
+                    } else {
+                        newMidY = initialMidY + dy;
+                        midHandle.setAttribute('cy', newMidY);
+                        const pathD = 'M ' + sPort.x + ' ' + sPort.y +
+                                      ' L ' + sPort.x + ' ' + newMidY +
+                                      ' L ' + tPort.x + ' ' + newMidY +
+                                      ' L ' + tPort.x + ' ' + tPort.y;
+                        pathEl.setAttribute('d', pathD);
+                        touchPathEl.setAttribute('d', pathD);
+                    }
+                }
+
+                function onMouseUp(upEvt) {
+                    window.removeEventListener('mousemove', onMouseMove);
+                    window.removeEventListener('mouseup', onMouseUp);
+
+                    if (hasMoved) {
+                        const finalDx = (upEvt.clientX - startDragX) / zoom;
+                        const finalDy = (upEvt.clientY - startDragY) / zoom;
+
+                        const finalUpdateMidX = (actualDir === 'East' || actualDir === 'West') ? (initialMidX + finalDx) : null;
+                        const finalUpdateMidY = (actualDir === 'North' || actualDir === 'South') ? (initialMidY + finalDy) : null;
+
+                        document.dispatchEvent(new CustomEvent('planist-update-connection', {
+                            detail: {
+                                from: conn.from,
+                                to: conn.to,
+                                relationType: conn.relationType,
+                                direction: actualDir,
+                                midX: finalUpdateMidX,
+                                midY: finalUpdateMidY
+                            }
+                        }));
+                    }
+                }
+
+                window.addEventListener('mousemove', onMouseMove);
+                window.addEventListener('mouseup', onMouseUp);
+            });
+
+            // Handle Port-handle dragging
+            portHandle.addEventListener('mousedown', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+
+                const fromNode = nodes.find(n => n.name === conn.from);
+                if (!fromNode) return;
+
+                let tempDir = actualDir;
+
+                function onMouseMove(moveEvt) {
+                    const rect = viewport.getBoundingClientRect();
+                    const mx = (moveEvt.clientX - rect.left - panX) / zoom;
+                    const my = (moveEvt.clientY - rect.top - panY) / zoom;
+
+                    const dx = mx - fromNode.midX;
+                    const dy = my - fromNode.midY;
+
+                    let newDir = 'East';
+                    if (Math.abs(dx) >= Math.abs(dy)) {
+                        newDir = dx > 0 ? 'East' : 'West';
+                    } else {
+                        newDir = dy > 0 ? 'South' : 'North';
+                    }
+
+                    if (newDir !== tempDir) {
+                        tempDir = newDir;
+                        
+                        // Temporarily update cache and redraw
+                        const connIndex = configuredConnections.findIndex(c => c.from === conn.from && c.to === conn.to && c.relationType === conn.relationType);
+                        if (connIndex !== -1) {
+                            configuredConnections[connIndex].direction = newDir;
+                            configuredConnections[connIndex].midX = null;
+                            configuredConnections[connIndex].midY = null;
+                        } else {
+                            configuredConnections.push({
+                                from: conn.from,
+                                to: conn.to,
+                                relationType: conn.relationType,
+                                direction: newDir,
+                                midX: null,
+                                midY: null
+                            });
+                        }
+                        renderConnections();
+                    }
+                }
+
+                function onMouseUp() {
+                    window.removeEventListener('mousemove', onMouseMove);
+                    window.removeEventListener('mouseup', onMouseUp);
+
+                    // Dispatch final connection update to persist
+                    document.dispatchEvent(new CustomEvent('planist-update-connection', {
+                        detail: {
+                            from: conn.from,
+                            to: conn.to,
+                            relationType: conn.relationType,
+                            direction: tempDir,
+                            midX: null,
+                            midY: null
+                        }
+                    }));
+                }
+
+                window.addEventListener('mousemove', onMouseMove);
+                window.addEventListener('mouseup', onMouseUp);
+            });
+
+            svg.appendChild(portHandle);
+            svg.appendChild(midHandle);
         }
     }
 
-    // @state: red
+    // @state: green
+    function triggerResetConnectionLayoutForSelected() {
+        if (!selectedEntityName) return;
+        
+        const nodes = [];
+        const cardElements = workspace.querySelectorAll('.board-node');
+        
+        activeEntities.forEach(entity => {
+            const pos = nodePositions[entity.name];
+            if (!pos) return;
+            
+            let width = 240;
+            let height = 150;
+            for (let i = 0; i < cardElements.length; i++) {
+                const titleEl = cardElements[i].querySelector('.node-title');
+                if (titleEl && titleEl.textContent === entity.name) {
+                    width = cardElements[i].offsetWidth || 240;
+                    height = cardElements[i].offsetHeight || 150;
+                    break;
+                }
+            }
+            
+            nodes.push({
+                name: entity.name,
+                left: pos.x,
+                top: pos.y,
+                right: pos.x + width,
+                bottom: pos.y + height,
+                midX: pos.x + width / 2,
+                midY: pos.y + height / 2,
+                w: width,
+                h: height
+            });
+        });
+
+        const relationTypes = [
+            { key: 'extendsTargets', type: 'extends' },
+            { key: 'inheritsTargets', type: 'inherits' },
+            { key: 'implementsTargets', type: 'implements' },
+            { key: 'associatesTargets', type: 'associates' },
+            { key: 'aggregatesTargets', type: 'aggregates' },
+            { key: 'composesTargets', type: 'composes' },
+            { key: 'dependsOnTargets', type: 'dependsOn' }
+        ];
+
+        const connectionsToReset = [];
+        
+        activeEntities.forEach(entity => {
+            relationTypes.forEach(rel => {
+                const targets = entity[rel.key] || [];
+                targets.forEach(targetName => {
+                    if (nodePositions[targetName]) {
+                        if (entity.name === selectedEntityName || targetName === selectedEntityName) {
+                            const fromNode = nodes.find(n => n.name === entity.name);
+                            const toNode = nodes.find(n => n.name === targetName);
+                            if (!fromNode || !toNode) return;
+
+                            const dx = toNode.midX - fromNode.midX;
+                            const dy = toNode.midY - fromNode.midY;
+                            
+                            let dir = 'East';
+                            if (Math.abs(dx) >= Math.abs(dy)) {
+                                dir = dx > 0 ? 'East' : 'West';
+                            } else {
+                                dir = dy > 0 ? 'South' : 'North';
+                            }
+
+                            let midX = null;
+                            let midY = null;
+                            const excludeNodeNames = [fromNode.name, toNode.name];
+
+                            if (dir === 'East') {
+                                const sPortX = fromNode.right;
+                                const tPortX = toNode.left;
+                                const minY = Math.min(fromNode.midY, toNode.midY);
+                                const maxY = Math.max(fromNode.midY, toNode.midY);
+                                const targetLimitX = Math.max(tPortX, sPortX + 30);
+                                midX = findSafeMidX(sPortX, targetLimitX, minY, maxY, excludeNodeNames, nodes);
+                            } else if (dir === 'West') {
+                                const sPortX = fromNode.left;
+                                const tPortX = toNode.right;
+                                const minY = Math.min(fromNode.midY, toNode.midY);
+                                const maxY = Math.max(fromNode.midY, toNode.midY);
+                                const targetLimitX = Math.min(tPortX, sPortX - 30);
+                                midX = findSafeMidX(targetLimitX, sPortX, minY, maxY, excludeNodeNames, nodes);
+                            } else if (dir === 'South') {
+                                const sPortY = fromNode.bottom;
+                                const tPortY = toNode.top;
+                                const minX = Math.min(fromNode.midX, toNode.midX);
+                                const maxX = Math.max(fromNode.midX, toNode.midX);
+                                const targetLimitY = Math.max(tPortY, sPortY + 30);
+                                midY = findSafeMidY(sPortY, targetLimitY, minX, maxX, excludeNodeNames, nodes);
+                            } else if (dir === 'North') {
+                                const sPortY = fromNode.top;
+                                const tPortY = toNode.bottom;
+                                const minX = Math.min(fromNode.midX, toNode.midX);
+                                const maxX = Math.max(fromNode.midX, toNode.midX);
+                                const targetLimitY = Math.min(tPortY, sPortY - 30);
+                                midY = findSafeMidY(targetLimitY, sPortY, minX, maxX, excludeNodeNames, nodes);
+                            }
+
+                            connectionsToReset.push({
+                                from: entity.name,
+                                to: targetName,
+                                relationType: rel.type,
+                                direction: dir,
+                                midX: midX,
+                                midY: midY
+                            });
+                        }
+                    }
+                });
+            });
+        });
+
+        if (connectionsToReset.length > 0) {
+            document.dispatchEvent(new CustomEvent('planist-update-multiple-connections', {
+                detail: { connections: connectionsToReset }
+            }));
+        }
+    }
+
+    // @state: green
     function renderBoardNodes(entities) {
         if (!workspace) return;
         
@@ -607,12 +1057,19 @@ export const NewFlowSchemaJS = `
 
         entities.forEach((entity, index) => {
             if (!nodePositions[entity.name]) {
-                const col = index % colsCount;
-                const row = Math.floor(index / colsCount);
-                nodePositions[entity.name] = {
-                    x: startX + col * colWidth,
-                    y: startY + row * rowHeight
-                };
+                if (entity.position) {
+                    nodePositions[entity.name] = {
+                        x: entity.position.x,
+                        y: entity.position.y
+                    };
+                } else {
+                    const col = index % colsCount;
+                    const row = Math.floor(index / colsCount);
+                    nodePositions[entity.name] = {
+                        x: startX + col * colWidth,
+                        y: startY + row * rowHeight
+                    };
+                }
             }
 
             const pos = nodePositions[entity.name];
@@ -717,11 +1174,15 @@ export const NewFlowSchemaJS = `
                 const startNodeY = nodePositions[entity.name].y;
                 const dragStartX = e.clientX;
                 const dragStartY = e.clientY;
+                let hasMoved = false;
 
-                // @state: red
+                // @state: green
                 function onMouseMove(moveEvt) {
                     const dx = moveEvt.clientX - dragStartX;
                     const dy = moveEvt.clientY - dragStartY;
+                    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                        hasMoved = true;
+                    }
 
                     nodePositions[entity.name].x = startNodeX + dx / zoom;
                     nodePositions[entity.name].y = startNodeY + dy / zoom;
@@ -735,6 +1196,25 @@ export const NewFlowSchemaJS = `
                 function onMouseUp() {
                     window.removeEventListener('mousemove', onMouseMove);
                     window.removeEventListener('mouseup', onMouseUp);
+                    
+                    if (hasMoved) {
+                        document.dispatchEvent(new CustomEvent('planist-update-entity-position', {
+                            detail: {
+                                entityName: entity.name,
+                                position: {
+                                    x: nodePositions[entity.name].x,
+                                    y: nodePositions[entity.name].y
+                                }
+                            }
+                        }));
+                    } else if (e.button === 0) {
+                        document.querySelectorAll('.board-node').forEach(n => n.classList.remove('selected'));
+                        card.classList.add('selected');
+                        selectedEntityName = entity.name;
+                        document.dispatchEvent(new CustomEvent('planist-node-selected', {
+                            detail: { entity }
+                        }));
+                    }
                 }
 
                 window.addEventListener('mousemove', onMouseMove);
@@ -829,6 +1309,7 @@ export const NewFlowSchemaJS = `
         if (message.command === 'updateGraph') {
             console.log('Received updateGraph in new board, rendering entities:', message.data);
             const entities = message.data.entities || [];
+            configuredConnections = message.data.connections || [];
             
             const backPanel = document.getElementById('back-btn-panel');
             if (backPanel) {

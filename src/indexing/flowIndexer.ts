@@ -60,6 +60,8 @@ export interface IndexedEntity {
 	display?: string;
 	contains?: string[];
 	parent?: string;
+	startLine?: number;
+	endLine?: number;
 }
 
 export class FlowIndexer implements vscode.Disposable {
@@ -280,6 +282,8 @@ export class FlowIndexer implements vscode.Disposable {
 				display: parsed.display,
 				contains: parsed.contains,
 				parent: parsed.parent,
+				startLine: parsed.startLine,
+				endLine: parsed.endLine,
 			};
 
 			// [除錯日誌] 快取實體對象

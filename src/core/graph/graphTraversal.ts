@@ -26,6 +26,11 @@ export interface MappedGraphEntity {
     modifiers?: string[];
     accessModifier?: string | null;
     returnType?: string | null;
+    startLine?: number;
+    endLine?: number;
+    visualOverride?: any;
+    comments?: string[];
+    textBody?: string;
 }
 
 export function findStartEntities(
@@ -123,7 +128,7 @@ function getEntityAllTargets(entity: FlowGraphEntity): string[] {
     return Array.from(targets);
 }
 
-// @state: red
+// @state: green
 export function mapGraphEntity(e: FlowGraphEntity, config: any, patterns: any): MappedGraphEntity {
     const patternStyle = e.pattern ? patterns[e.pattern]?.webview_style : undefined;
     return {
@@ -139,7 +144,8 @@ export function mapGraphEntity(e: FlowGraphEntity, config: any, patterns: any): 
             type: f.type,
             accessModifier: f.accessModifier,
             line: f.line,
-            modifiers: f.modifiers || []
+            modifiers: f.modifiers || [],
+            comments: f.comments
         })),
         methods: (e.methods || []).map((m: any) => ({
             name: m.name,
@@ -148,7 +154,8 @@ export function mapGraphEntity(e: FlowGraphEntity, config: any, patterns: any): 
             returnType: m.returnType,
             accessModifier: m.accessModifier,
             line: m.line,
-            modifiers: m.modifiers || []
+            modifiers: m.modifiers || [],
+            comments: m.comments
         })),
         references: e.references || [],
         relationTargets: e.relationTargets || [],
@@ -159,7 +166,12 @@ export function mapGraphEntity(e: FlowGraphEntity, config: any, patterns: any): 
         aggregatesTargets: e.aggregatesTargets || [],
         composesTargets: e.composesTargets || [],
         dependsOnTargets: e.dependsOnTargets || [],
-        renderStyle: {}
+        renderStyle: {},
+        startLine: e.startLine,
+        endLine: e.endLine,
+        visualOverride: e.visualOverride,
+        comments: e.comments,
+        textBody: e.textBody
     };
 }
 
@@ -167,7 +179,7 @@ export interface CallChainData {
     nodes: MappedGraphEntity[];
 }
 
-// @state: red
+// @state: green
 export function traverseCallChain(
     allEntities: FlowGraphEntity[],
     startEntityName: string,

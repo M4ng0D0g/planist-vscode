@@ -1,0 +1,48 @@
+// @state: yellow
+export const NewFlowSchemaSettingsJS = `
+(function() {
+    console.log('====== Planist Visualizer Node Settings Panel Core Activated ======');
+    let selectedEntity = null;
+    let localFields = [];
+    let localMethods = [];
+
+    // DOM Elements
+    const settingsPanel = document.getElementById('settings-panel');
+    const closeBtn = document.getElementById('close-settings-btn');
+    const tabDef = document.getElementById('tab-definition');
+    const tabRender = document.getElementById('tab-rendering');
+    const contentDef = document.getElementById('settings-content-definition');
+    const contentRender = document.getElementById('settings-content-rendering');
+
+    // HSL Sliders DOM
+    const sliderH = document.getElementById('slider-h');
+    const sliderS = document.getElementById('slider-s');
+    const sliderL = document.getElementById('slider-l');
+    const valH = document.getElementById('val-h');
+    const valS = document.getElementById('val-s');
+    const valL = document.getElementById('val-l');
+    const colorPreview = document.getElementById('color-preview');
+    const resetColorBtn = document.getElementById('reset-color-btn');
+
+    // Close panel click
+    closeBtn.addEventListener('click', () => {
+        settingsPanel.classList.remove('open');
+        document.querySelectorAll('.board-node').forEach(n => n.classList.remove('selected'));
+    });
+
+    // Tab switching logic
+    tabDef.addEventListener('click', () => switchTab('definition'));
+    tabRender.addEventListener('click', () => switchTab('rendering'));
+
+    function switchTab(tab) {
+        if (tab === 'definition') {
+            tabDef.classList.add('active');
+            tabRender.classList.remove('active');
+            contentDef.style.display = 'flex';
+            contentRender.style.display = 'none';
+        } else {
+            tabDef.classList.remove('active');
+            tabRender.classList.add('active');
+            contentDef.style.display = 'none';
+            content
+<truncated 19964 bytes>

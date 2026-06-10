@@ -17,7 +17,8 @@ suite('Planist Language Intelligence Tests', () => {
 
 	test('Indexer can parse and index content manually', () => {
 		const testUri = vscode.Uri.file('/path/to/workspace/OrderSystem.pln');
-		const content = `class OrderSystem {
+		const content = `#schema flow
+class OrderSystem {
     bind: "../src/OrderSystem.ts"
     [Methods]
     + processOrder(orderId, amount) {
@@ -38,13 +39,14 @@ suite('Planist Language Intelligence Tests', () => {
 
 	test('CompletionProvider suggests entities on -> trigger', async () => {
 		const testUri = vscode.Uri.file('/path/to/workspace/OrderSystem.pln');
-		const content = `class OrderSystem {
+		const content = `#schema flow
+class OrderSystem {
     [Relations]
     -> 
 }`;
 		(indexer as any).indexContent(testUri, content);
 		// Also index another dummy entity
-		(indexer as any).indexContent(vscode.Uri.file('/path/to/workspace/PaymentService.pln'), 'class PaymentService {}');
+		(indexer as any).indexContent(vscode.Uri.file('/path/to/workspace/PaymentService.pln'), '#schema flow\nclass PaymentService {}');
 
 		const provider = new FlowCompletionItemProvider(indexer);
 		
@@ -70,14 +72,15 @@ suite('Planist Language Intelligence Tests', () => {
 
 	test('CompletionProvider suggests methods on entity. trigger', async () => {
 		const testUri = vscode.Uri.file('/path/to/workspace/OrderSystem.pln');
-		const content = `class OrderSystem {}`;
+		const content = `#schema flow\nclass OrderSystem {}`;
 		(indexer as any).indexContent(testUri, content);
 
 		// Index target entity with methods
-		const targetContent = `class PaymentService {
+		const targetContent = `#schema flow
+class PaymentService {
     [Methods]
-    + charge(amount) {}
-    + refund(amount) {}
+    + charge(amount)
+    + refund(amount)
 }`;
 		(indexer as any).indexContent(vscode.Uri.file('/path/to/workspace/PaymentService.pln'), targetContent);
 
@@ -104,7 +107,8 @@ suite('Planist Language Intelligence Tests', () => {
 
 	test('HoverProvider shows entity and method previews', async () => {
 		const testUri = vscode.Uri.file('/path/to/workspace/OrderSystem.pln');
-		const content = `class OrderSystem {
+		const content = `#schema flow
+class OrderSystem {
     [Methods]
     + run() {
         -> PaymentService.charge(100)
@@ -112,9 +116,10 @@ suite('Planist Language Intelligence Tests', () => {
 }`;
 		(indexer as any).indexContent(testUri, content);
 
-		const targetContent = `class PaymentService {
+		const targetContent = `#schema flow
+class PaymentService {
     [Methods]
-    + charge(amount) {}
+    + charge(amount)
 }`;
 		(indexer as any).indexContent(vscode.Uri.file('/path/to/workspace/PaymentService.pln'), targetContent);
 
@@ -126,7 +131,7 @@ suite('Planist Language Intelligence Tests', () => {
 			uri: testUri,
 		} as unknown as vscode.TextDocument;
 
-		const position = new vscode.Position(3, 15); // "-> PaymentService.charge"
+		const position = new vscode.Position(4, 15); // "-> PaymentService.charge"
 		const token = new vscode.CancellationTokenSource().token;
 
 		const hover = await provider.provideHover(doc, position, token);
@@ -143,11 +148,11 @@ suite('Planist Language Intelligence Tests', () => {
 		
 		const doc = {
 			lineAt: (pos: vscode.Position) => ({ text: '    ' }),
-			getText: () => '',
+			getText: () => '#schema flow\nclass OrderSystem {\n    ',
 			uri: vscode.Uri.file('/path/to/workspace/OrderSystem.pln'),
 		} as unknown as vscode.TextDocument;
 
-		const position = new vscode.Position(0, 4); // position at start after spaces
+		const position = new vscode.Position(2, 4); // position inside the class block after spaces
 		const token = new vscode.CancellationTokenSource().token;
 		const context = { triggerKind: vscode.CompletionTriggerKind.Invoke } as vscode.CompletionContext;
 
@@ -156,11 +161,11 @@ suite('Planist Language Intelligence Tests', () => {
 		const items = result as vscode.CompletionItem[];
 		
 		const labels = items.map(item => item.label);
-		assert.ok(labels.includes('inherits'));
-		assert.ok(labels.includes('implements'));
-		assert.ok(labels.includes('associates'));
-		assert.ok(labels.includes('aggregates'));
-		assert.ok(labels.includes('composes'));
-		assert.ok(labels.includes('dependsOn'));
+		assert.ok(labels.includes('inherits ->'));
+		assert.ok(labels.includes('implements ->'));
+		assert.ok(labels.includes('associates ->'));
+		assert.ok(labels.includes('aggregates ->'));
+		assert.ok(labels.includes('composes ->'));
+		assert.ok(labels.includes('dependsOn ->'));
 	});
 });

@@ -119,6 +119,8 @@ export interface FlowDocumentModel {
 	contains?: string[];        // 包裹明確包含的實體
 	parent?: string;            // 所屬的父級包裹
 	textBody?: string;          // 任意文字區塊內容
+	startLine?: number;
+	endLine?: number;
 }
 
 /**
@@ -162,6 +164,8 @@ export interface FlowGraphEntity {
 	contains?: string[];
 	parent?: string;
 	textBody?: string;
+	startLine?: number;
+	endLine?: number;
 }
 
 /**
@@ -250,6 +254,10 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 		display?: string;
 		contains: string[];
 		textLines?: string[];
+		bindSourcePath: string | null;
+		autoImport: boolean;
+		startLine?: number;
+		endLine?: number;
 	} | null = null;
 
 	let activeComments: string[] = [];
@@ -368,6 +376,9 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 				display: undefined,
 				contains: [],
 				textLines: [],
+				bindSourcePath: null,
+				autoImport: false,
+				startLine: lineIndex,
 			};
 			activeComments = [];
 			activePattern = undefined;
@@ -450,6 +461,22 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 		const displayMatch = line.match(displayPattern);
 		if (displayMatch && (currentEntity.blockKind === 'package' || currentEntity.blockKind === 'module')) {
 			currentEntity.display = displayMatch[1].trim();
+			activeComments = [];
+			continue;
+		}
+
+		// 解析 bind: "..."
+		const bindMatch = line.match(bindPattern);
+		if (bindMatch) {
+			currentEntity.bindSourcePath = bindMatch[1].trim();
+			activeComments = [];
+			continue;
+		}
+
+		// 解析 autoImport: true/false
+		const autoImportMatch = line.match(autoImportPattern);
+		if (autoImportMatch) {
+			currentEntity.autoImport = autoImportMatch[1].toLowerCase() === 'true';
 			activeComments = [];
 			continue;
 		}
@@ -665,6 +692,7 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 
 		// 關閉實體
 		if (currentEntity && currentEntity.hasBraces && currentEntity.braceDepth <= 0) {
+			currentEntity.endLine = lineIndex;
 			documents.push(finalizeEntity(currentEntity, referenceFiles));
 			currentEntity = null;
 		}
@@ -675,6 +703,7 @@ export function parseFlowDocuments(text: string): FlowDocumentModel[] {
 	}
 
 	if (currentEntity) {
+		currentEntity.endLine = lines.length - 1;
 		// [除錯日誌] 紀錄封存最後一個解析實體
 		LogManager.log('parseFlowDocuments: finalizing last entity:', currentEntity.entityName);
 		documents.push(finalizeEntity(currentEntity, referenceFiles));
@@ -699,8 +728,8 @@ function finalizeEntity(entity: any, referenceFiles: string[]): FlowDocumentMode
 		blockKind: entity.blockKind,
 		accessModifier: entity.accessModifier,
 		pattern: entity.pattern,
-		bindSourcePath: null,
-		autoImport: false,
+		bindSourcePath: entity.bindSourcePath,
+		autoImport: entity.autoImport,
 		styleColor: entity.styleColor,
 		styleBorderColor: entity.styleBorderColor,
 		styleRadius: entity.styleRadius,
@@ -722,6 +751,8 @@ function finalizeEntity(entity: any, referenceFiles: string[]): FlowDocumentMode
 		display: entity.display,
 		contains: entity.contains && entity.contains.length > 0 ? entity.contains : undefined,
 		textBody: entity.textLines && entity.textLines.length > 0 ? entity.textLines.join('\n') : undefined,
+		startLine: entity.startLine,
+		endLine: entity.endLine,
 	};
 }
 

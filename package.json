@@ -70,6 +70,21 @@
         }
       ]
     },
+    "customEditors": [
+      {
+        "viewType": "planist.flowEditor",
+        "displayName": "Planist Flow Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.pln"
+          },
+          {
+            "filenamePattern": "*.flow"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
     "configuration": [
       {
         "title": "一般",

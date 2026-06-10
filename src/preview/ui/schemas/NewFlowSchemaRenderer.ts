@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 import { ISchemaRenderer } from './SchemaRenderer';
 import { NewFlowSchemaJS } from './NewFlowSchemaJS';
+import { NewFlowSchemaSettingsCSS } from './NewFlowSchemaSettingsCSS';
+import { NewFlowSchemaSettingsJS } from './NewFlowSchemaSettingsJS';
 
-// @state: red
+// @state: green
 export const NewFlowSchemaCSS = `
     :root {
         --bg-color: #0c0c0e;
@@ -394,13 +396,52 @@ export const NewFlowSchemaCSS = `
     body.vscode-light .item-btn:hover {
         background-color: rgba(0, 0, 0, 0.06);
     }
+
+    /* Canvas Context Menu */
+    #canvas-context-menu {
+        position: fixed;
+        z-index: 1000;
+        background: rgba(20, 20, 25, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        display: none;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        padding: 4px 0;
+        min-width: 140px;
+    }
+    #canvas-context-menu.open {
+        display: block;
+    }
+    .context-menu-item {
+        padding: 8px 12px;
+        font-size: 13px;
+        color: #f3f4f6;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+    .context-menu-item:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+    }
+    body.vscode-light #canvas-context-menu {
+        background: rgba(255, 255, 255, 0.98);
+        border-color: rgba(0, 0, 0, 0.15);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    }
+    body.vscode-light .context-menu-item {
+        color: #1f2937;
+    }
+    body.vscode-light .context-menu-item:hover {
+        background-color: rgba(0, 0, 0, 0.06);
+    }
 `;
 
-// @state: red
+// @state: green
 export class NewFlowSchemaRenderer implements ISchemaRenderer {
-    // @state: red
+    // @state: green
     public renderPage(webview: vscode.Webview, nonce: string) {
-        // @state: red
+        // @state: green
         return {
             render: (): string => {
                 const htmlParts: string[] = [];
@@ -414,6 +455,7 @@ export class NewFlowSchemaRenderer implements ISchemaRenderer {
                 htmlParts.push('    <title>Planist Infinite Board</title>');
                 htmlParts.push('    <style>');
                 htmlParts.push(NewFlowSchemaCSS);
+                htmlParts.push(NewFlowSchemaSettingsCSS);
                 htmlParts.push('    </style>');
                 htmlParts.push('</head>');
                 htmlParts.push('<body>');
@@ -422,7 +464,7 @@ export class NewFlowSchemaRenderer implements ISchemaRenderer {
                 htmlParts.push('    <div class="hud-panel hud-top-left" id="back-btn-panel" style="display: none;">');
                 htmlParts.push('        <button class="hud-btn primary" id="backBtn" style="width: auto; padding: 0 12px;" title="返回實體總覽">返回實體總覽</button>');
                 htmlParts.push('    </div>');
-
+ 
                 // Infinite Viewport container
                 htmlParts.push('    <div id="viewport">');
                 htmlParts.push('        <div id="grid-bg"></div>');
@@ -433,6 +475,11 @@ export class NewFlowSchemaRenderer implements ISchemaRenderer {
                 
                 // Floating Tooltip container
                 htmlParts.push('    <div id="tooltip"></div>');
+                
+                // Canvas Context Menu container
+                htmlParts.push('    <div id="canvas-context-menu" class="canvas-context-menu">');
+                htmlParts.push('        <div class="context-menu-item" id="ctx-create-node">建立實體節點</div>');
+                htmlParts.push('    </div>');
                 
                 // Bottom Left Fullscreen HUD Control
                 htmlParts.push('    <div class="hud-panel hud-bottom-left">');
@@ -447,9 +494,55 @@ export class NewFlowSchemaRenderer implements ISchemaRenderer {
                 htmlParts.push('        <button class="hud-btn" id="zoom-reset-btn" title="Reset View">⟲</button>');
                 htmlParts.push('    </div>');
 
+                // Right Slide-out Settings Panel HTML
+                htmlParts.push('    <div id="settings-panel" class="settings-panel">');
+                htmlParts.push('        <div class="settings-header">');
+                htmlParts.push('            <span class="settings-title">節點設定 (Settings)</span>');
+                htmlParts.push('            <button class="close-settings-btn" id="close-settings-btn">&times;</button>');
+                htmlParts.push('        </div>');
+                htmlParts.push('        <div class="settings-tabs">');
+                htmlParts.push('            <div class="settings-tab active" id="tab-definition">屬性</div>');
+                htmlParts.push('            <div class="settings-tab" id="tab-rendering">渲染</div>');
+                htmlParts.push('        </div>');
+                htmlParts.push('        <div class="settings-content" id="settings-content-definition" style="display: flex;">');
+                htmlParts.push('            <!-- Definition inputs generated dynamically -->');
+                htmlParts.push('        </div>');
+                htmlParts.push('        <div class="settings-content" id="settings-content-rendering" style="display: none;">');
+                htmlParts.push('            <div class="form-group">');
+                htmlParts.push('                <span class="form-label">HSL 顏色覆寫</span>');
+                htmlParts.push('                <div class="hsl-slider-group">');
+                htmlParts.push('                    <div class="slider-row">');
+                htmlParts.push('                        <div class="slider-header"><span>色相 (Hue)</span><span id="val-h">210°</span></div>');
+                htmlParts.push('                        <div class="slider-container">');
+                htmlParts.push('                            <input type="range" id="slider-h" min="0" max="360" value="210">');
+                htmlParts.push('                        </div>');
+                htmlParts.push('                    </div>');
+                htmlParts.push('                    <div class="slider-row">');
+                htmlParts.push('                        <div class="slider-header"><span>飽和度 (Saturation)</span><span id="val-s">80%</span></div>');
+                htmlParts.push('                        <div class="slider-container">');
+                htmlParts.push('                            <input type="range" id="slider-s" min="0" max="100" value="80">');
+                htmlParts.push('                        </div>');
+                htmlParts.push('                    </div>');
+                htmlParts.push('                    <div class="slider-row">');
+                htmlParts.push('                        <div class="slider-header"><span>亮度 (Lightness)</span><span id="val-l">50%</span></div>');
+                htmlParts.push('                        <div class="slider-container">');
+                htmlParts.push('                            <input type="range" id="slider-l" min="0" max="100" value="50">');
+                htmlParts.push('                        </div>');
+                htmlParts.push('                    </div>');
+                htmlParts.push('                </div>');
+                htmlParts.push('            </div>');
+                htmlParts.push('            <div class="form-group" style="margin-top: 10px;">');
+                htmlParts.push('                <span class="form-label">最近顏色 (Recent Colors)</span>');
+                htmlParts.push('                <div id="recent-colors-container" class="recent-colors-container"></div>');
+                htmlParts.push('            </div>');
+                htmlParts.push('            <button class="reset-color-btn" id="reset-color-btn">還原預設顏色 (Reset)</button>');
+                htmlParts.push('        </div>');
+                htmlParts.push('    </div>');
+
                 // Inject our frontend Javascript script block
                 htmlParts.push(`    <script nonce="${nonce}">`);
                 htmlParts.push(NewFlowSchemaJS);
+                htmlParts.push(NewFlowSchemaSettingsJS);
                 htmlParts.push('    </script>');
                 
                 htmlParts.push('</body>');

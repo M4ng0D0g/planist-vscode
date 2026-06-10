@@ -5,13 +5,15 @@ import { loadPlanistConfig, resolveEntityStyle } from '../config/planistConfig';
 import { PatternManager } from '../config/patternManager';
 import { FlowIndexer } from '../indexing/flowIndexer';
 
-// @state: red
+// @state: green
 export async function prepareGraphData(
     indexer: FlowIndexer | undefined, 
     viewMode: string,
-    callChainStart?: { entityName: string; methodName: string }
+    callChainStart?: { entityName: string; methodName: string },
+    documentUri?: vscode.Uri
 ): Promise<{
     entities: MappedGraphEntity[];
+    connections: any[];
     config: any;
     boardConfig: any;
 }> {
@@ -19,23 +21,85 @@ export async function prepareGraphData(
     const graph = await buildCompiledGraph();
     const allEntities = graph.entities;
 
+    // Read style, position and connection overrides from .planist/.render/.render.json
+    let renderData: any = null;
+    const targetUri = documentUri || vscode.window.activeTextEditor?.document.uri;
+    if (targetUri) {
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(targetUri);
+        if (workspaceFolder) {
+            const fs = require('fs');
+            const path = require('path');
+            const filePath = path.join(workspaceFolder.uri.fsPath, '.planist', '.render', '.render.json');
+            if (fs.existsSync(filePath)) {
+                try {
+                    renderData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                } catch (err) {
+                    console.error('Failed to parse .render.json:', err);
+                }
+            }
+        }
+    }
+
     let graphEntities: MappedGraphEntity[] = [];
 
     if (viewMode === 'callchain' && callChainStart) {
         const result = traverseCallChain(allEntities, callChainStart.entityName, callChainStart.methodName);
-        graphEntities = result.nodes;
+        graphEntities = result.nodes.map(node => {
+            if (renderData && renderData.entities && renderData.entities[node.name]) {
+                const custom = renderData.entities[node.name];
+                if (custom.position) {
+                    (node as any).position = custom.position;
+                }
+                if (custom.color) {
+                    if (!node.visualOverride) {
+                        node.visualOverride = {};
+                    }
+                    node.visualOverride.color = custom.color;
+                    if (node.renderStyle) {
+                        node.renderStyle.color = custom.color;
+                    }
+                }
+            }
+            return node;
+        });
     } else {
-        const activeEditor = vscode.window.activeTextEditor;
-        const activeText = activeEditor?.document.getText();
-        const activeUri = activeEditor?.document.uri;
+        let activeText = '';
+        if (documentUri) {
+            const doc = vscode.workspace.textDocuments.find(d => d.uri.toString() === documentUri.toString());
+            if (doc) {
+                activeText = doc.getText();
+            } else {
+                activeText = vscode.window.activeTextEditor?.document.getText() || '';
+            }
+        } else {
+            activeText = vscode.window.activeTextEditor?.document.getText() || '';
+        }
+        const activeUri = documentUri || vscode.window.activeTextEditor?.document.uri;
 
         const startEntities = findStartEntities(allEntities, activeText, activeUri, indexer);
         const filteredEntities = filterEntitiesByView(allEntities, startEntities);
         
         const patterns = PatternManager.loadPatterns();
+
         graphEntities = filteredEntities.map(e => {
             const mapped = mapGraphEntity(e, config, patterns);
             mapped.renderStyle = resolveEntityStyle(e, config);
+            
+            if (renderData && renderData.entities && renderData.entities[mapped.name]) {
+                const custom = renderData.entities[mapped.name];
+                if (custom.position) {
+                    (mapped as any).position = custom.position;
+                }
+                if (custom.color) {
+                    if (!mapped.visualOverride) {
+                        mapped.visualOverride = {};
+                    }
+                    mapped.visualOverride.color = custom.color;
+                    if (mapped.renderStyle) {
+                        mapped.renderStyle.color = custom.color;
+                    }
+                }
+            }
             return mapped;
         });
     }
@@ -54,6 +118,7 @@ export async function prepareGraphData(
 
     return {
         entities: graphEntities,
+        connections: renderData?.connections || [],
         config,
         boardConfig
     };
