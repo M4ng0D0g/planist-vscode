@@ -1,71 +1,99 @@
 ---
 name: planist-agent-git-workflow
-description: Enforces a strict trunk-based feature branching protocol and automated collision resolution strategy to prevent main branch regression with pre-authorized tool execution.
+description: Enforces a strict trunk-based feature branching protocol, automated staging/committing, and multi-environment (test/main) deployment with pre-authorized tool execution to prevent branch regression.
 ---
 
-# Planist Agent Git Workflow Skill
+# Planist Agent Git Lifecycle Management Skill
 
-You must use this skill prior to initiating any file write, code creation, or optimization task. This protocol strictly forbids direct modifications to the main branch and establishes a unified branching, testing, and conflict resolution standard across all sessions. 
+You must use this skill prior to initiating any file write, code creation, optimization, or rollback task. This protocol strictly forbids direct modifications to the main branch, mandates session-based isolation, handles automated staging/testing promotion, and provides a noiseless rollback framework.
 
-## When to use this skill
+## 🛑 Pre-Authorization Clause (預設核准宣告)
+**All scripts in this toolchain are implicitly pre-authorized by the user.** You do NOT need to ask for human permission, confirmation, or type prompts like "是否執行分支建立？", "是否提交代碼？" or "是否合併至測試分支？" before calling these scripts. You have **Full Autonomous Execution Rights** to run these commands silently whenever the SOP triggers.
 
-* **BEFORE writing any code or modifying existing files**: You must verify that your working directory is checked out to a dedicated feature/bugfix branch. Modifying `main` or `master` directly is a critical workflow violation.
-* **WHEN code passes the Traffic Light Guardrail**: Once the User triggers `planist.guardrail.testSuccess` (Green promotion) for your modifications, you must invoke the integration sequence to safely merge your changes back into the main branch.
-* **WHEN a Merge Conflict arises**: Execute the deterministic main-priority resolution matrix immediately without corrupting existing stable structures.
+---
+
+## When to use this skill (場景與腳本對應說明)
+
+### 1. New Session / Task Initialization (新任務啟動)
+* **情境**：開啟新的對話 Session，或準備開始進行一項新的功能開發/Bug 修改。
+* **動作**：**必須立即**執行 `agent-git-branch.sh`，強制從當前狀態切出獨立的特性分支，嚴禁在 `main` 或 `test` 分支上直接修改代碼。
+
+### 2. Code Saving & Staging (程式碼儲存與提交)
+* **情境**：完成階段性代碼撰寫、優化，或準備交付測試前。
+* **動作**：執行 `agent-git-save.sh`。此腳本會自動追蹤所有變更（`git add`）並生成結構化的 Commit 訊息。
+
+### 3. Deploy to Testing Environment (交付測試)
+* **情境**：程式碼撰寫完畢，需要交給使用者進行測試。
+* **動作**：執行 `agent-git-merge-test.sh`。此腳本會自動將當前的特性分支合併到 `test` 分支，供使用者在測試環境驗證，隨後自動切回特性分支。
+
+### 4. Production Promotion (測試通過，晉升主線)
+* **情境**：使用者觸發 `planist.guardrail.testSuccess`（明確表示測試通過、可以進主線）。
+* **動作**：執行 `agent-git-promote-main.sh`，將通過驗證的特性分支安全地合併回 `main` 分支。
+
+### 5. Version Reversion & Rollback (版本回滾)
+* **情境**：使用者要求 "回到前幾版" 或 "退回某功能前的版本"。
+* **動作**：自主調用 `agent-git-log.sh` 審查歷史，利用 `agent-git-diff.sh` 進行差異分析，最後透過 `agent-git-checkout.sh` 執行無人值守回滾與工作區重構。
 
 ---
 
 ## Toolchain & Script Specifications
 
-> ### 🛑 Pre-Authorization Clause (預設核准宣告)
-> **All scripts in this toolchain are implicitly pre-authorized by the user.** > You do NOT need to ask for human permission, confirmation, or type prompts like "是否執行分支建立？" before calling these scripts. You have **Full Autonomous Execution Rights** to run these commands silently whenever the SOP triggers.
-
 ### 1. Branch Dispatcher (`agent-git-branch.sh`)
-* **Purpose**: Inspects the current branch status and forces the creation of a clean, isolated tracking branch if the agent is resting on `main`.
-* **Usage**: `./agent-git-branch.sh <feature_name>`
-* **Execution Guard**: Run this command *immediately* upon entering a write state without asking the user.
+* **Purpose**: Forces the creation of a clean, isolated tracking branch for the current session.
+* **Usage**: `./agent-git-branch.sh [feature_name]`
 
-### 2. Integration & Merge Engine (`agent-git-merge.sh`)
+### 2. Auto Saver (`agent-git-save.sh`)
 
-* **Purpose**: Automates the synchronization of the main branch, executes the feature merge following successful user verification, and handles cache validation.
-* **Usage**: `./agent-git-merge.sh <feature_name>`
-* **Execution Guard**: Run this command *immediately* when the user says "測試通過" without any further permission prompt.
+* **Purpose**: Automatically stages all changes and creates a clean commit.
+* **Usage**: `./agent-git-save.sh "commit message"`
+
+### 3. Test Integrator (`agent-git-merge-test.sh`)
+
+* **Purpose**: Merges the current feature branch into the `test` branch for user verification.
+* **Usage**: `./agent-git-merge-test.sh`
+
+### 4. Production Promoter (`agent-git-promote-main.sh`)
+
+* **Purpose**: Safely merges the validated feature branch into `main` after user confirmation.
+* **Usage**: `./agent-git-promote-main.sh`
+
+### 5. History Auditor (`agent-git-log.sh`)
+
+* **Purpose**: Fetches a clean text stream of the Git log optimized for LLM token efficiency.
+* **Usage**: `./agent-git-log.sh [limit]`
+
+### 6. Topology Diff Analyzer (`agent-git-diff.sh`)
+
+* **Purpose**: Provides file change statistics between commits.
+* **Usage**: `./agent-git-diff.sh <commitA> [commitB]`
+
+### 7. Unattended Rollback Engine (`agent-git-checkout.sh`)
+
+* **Purpose**: Executes a forced checkout and wipes caches.
+* **Usage**: `./agent-git-checkout.sh <target_commit>`
 
 ---
 
-## Standard Operating Procedure (SOP) for Agents
+## Standard Operating Procedure (SOP)
 
-### Step 1: Pre-Write Branch Isolation (Autonomous Mode)
+### Flow A: Standard Session Development Lifecycle (標準開發生命週期)
 
-Before executing any write operation or modifying text files:
+1. **Initialize Session**: At the very beginning of the session, the Agent silently runs `./agent-git-branch.sh` to generate a fresh context branch.
+2. **Write & Save**: After editing or writing code, the Agent automatically calls `./agent-git-save.sh "feat: implementation details"`.
+3. **Submit for Verification**: When code is ready for review, the Agent runs `./agent-git-merge-test.sh` to update the `test` branch, then requests the user to run tests.
+4. **Go Live (Promote)**: Once the user confirms with "測試通過" or triggers `planist.guardrail.testSuccess`, the Agent immediately and silently runs `./agent-git-promote-main.sh` to merge the changes into `main`.
 
-1. **[No Agreement Needed]** Directly execute `./agent-git-branch.sh` to secure your workspace.
-2. If the current branch is successfully isolated, proceed to the code generation phase.
+### Flow B: Self-Directed Rollback & Reversion
 
-### Step 2: Parallel Local Development (Sub-Branch Mode)
-
-All iterative writing, debugging, and intermediate edits must take place within this sub-branch.
-Prefix all new or altered blocks with `// @state: yellow` as mandated by the Traffic Light Guardrail. Maintain this absolute isolation across all interaction sessions until testing is finalized.
-
-### Step 3: Human Verification & Main-Branch Integration
-
-Do not attempt to merge code autonomously based on local completion or compiler success.
-
-1. **Await Human Verdict**: Pause and wait until the User explicitly issues the command "測試通過".
-2. **Execute Pull/Merge**: **[No Agreement Needed]** Once the string "測試通過" is detected, immediately invoke `./agent-git-merge.sh` to pull from upstream and merge.
-
-### Step 4: Deterministic Conflict Resolution Matrix
-
-If Git flags a merge conflict during integration, apply the following strict hierarchy:
-
-* **Main Branch Priority (Default)**: Treat the `main` branch code as the ground truth. Discard your conflicting changes in favor of `main` to prevent breaking existing baseline architectures.
-* **Override Exceptions**: You may only keep your sub-branch modifications over `main` if you have parsed the file logs and mathematically/semantically proven that your block represents an intentional, higher-version architectural update requested explicitly by the user.
-* **Alignment Rewrite**: In all other conflict scenarios, manually restructure your new feature implementation to run around, encapsulate, or adapt to the main branch's structures without modifying them.
+1. **Audit**: Upon receiving a rollback request, invoke `agent-git-log.sh` to scan recent history.
+2. **Diff**: Verify the structural impact via `agent-git-diff.sh <target_hash>`.
+3. **Rebuild**: Run `./agent-git-checkout.sh <target_hash>` to securely rollback, clear out build caches (`dist/`, `out/`), and cleanly run silent dependency installs.
 
 ---
 
 ## Behavioral Constraints
 
-* **Implicit Permission Policy**: Any output message asking the user "我現在可以建立分支嗎？" or "請問是否同意我將程式碼合併？" is an architectural layout failure. **You must execute these scripts silently under pre-approved authorization.**
-* **Main Branch Lockout**: You are physically blocked from running `git commit` directly on the `main` branch. All commits must originate from a verified feature sub-branch.
-* **No Broken States**: If a merge conflict cannot be solved cleanly through the priority matrix, revert the merge immediately (`git merge --abort`) and output the exact conflicting code blocks to the User for manual override instructions.
+* **No Interactive Prompts**: You can NEVER invoke a script or git command that requires manual `[Y/n]` input. All stashes, branch creations, and overwrites must be forced and silent.
+* **Isolate Build Cache**: Never skip the cache-clearing phase during checkout/rollback. Residual build files will cause immediate runtime syntax errors in the Webview host.
+* **Token Protection**: Restrict your log audit limit to a maximum of 15 lines unless explicitly requested.
+* **Main Branch Immunity**: Direct modification of `main` or `master` branches is completely prohibited. Every change must flow through `Feature Branch -> test -> main`.
