@@ -14,6 +14,17 @@ export const DocsSchemaCSS = `
         --paper-text: #202124;
         --paper-border: #e5e7eb;
         --danger-color: #dc2626;
+
+        /* Typography & Layout defaults */
+        --paper-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        --paper-font-size: 14px;
+        --paper-line-height: 1.65;
+        --paper-width: 794px;
+
+        /* Theme-specific overrides for pages */
+        --theme-paper-bg: var(--paper-bg);
+        --theme-paper-text: var(--paper-text);
+        --theme-paper-border: var(--paper-border);
     }
 
     body.vscode-light {
@@ -48,8 +59,9 @@ export const DocsSchemaCSS = `
     #app-container {
         display: flex;
         width: 100vw;
-        height: 100vh;
+        height: calc(100vh - 48px);
         overflow: hidden;
+        transition: all 0.25s ease;
     }
 
     #sidebar {
@@ -61,6 +73,16 @@ export const DocsSchemaCSS = `
         flex-direction: column;
         height: 100%;
         user-select: none;
+        transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, border 0.25s ease;
+        opacity: 1;
+    }
+
+    #sidebar.collapsed {
+        width: 0 !important;
+        min-width: 0 !important;
+        opacity: 0;
+        pointer-events: none;
+        border-right: none;
     }
 
     #doc-title-container {
@@ -199,16 +221,22 @@ export const DocsSchemaCSS = `
     }
 
     .paper-page {
-        width: min(794px, calc(100vw - 340px));
-        min-height: min(1123px, calc((100vw - 340px) * 1.414));
-        background: var(--paper-bg);
-        color: var(--paper-text);
+        width: var(--paper-width);
+        max-width: 95%;
+        min-height: calc(var(--paper-width) * 1.414);
+        background: var(--theme-paper-bg);
+        color: var(--theme-paper-text);
+        border: 1px solid var(--theme-paper-border);
         box-shadow: 0 12px 34px rgba(0, 0, 0, 0.24);
         padding: 72px 76px;
         box-sizing: border-box;
         border-radius: 4px;
         position: relative;
         text-align: left;
+        font-family: var(--paper-font-family);
+        font-size: var(--paper-font-size);
+        line-height: var(--paper-line-height);
+        transition: width 0.25s ease, min-height 0.25s ease, background 0.2s ease, color 0.2s ease;
     }
 
     .page-header-hud {
@@ -371,21 +399,159 @@ export const DocsSchemaCSS = `
         #content-viewport {
             padding: 14px;
         }
+    }
 
-        .paper-page {
-            width: calc(100vw - 232px);
-            min-height: calc((100vw - 232px) * 1.414);
-            padding: 54px 32px;
-        }
+    /* Horizontal Toolbar Styling */
+    #toolbar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 48px;
+        background: var(--sidebar-bg);
+        border-bottom: 1px solid var(--sidebar-border);
+        padding: 0 16px;
+        box-sizing: border-box;
+        z-index: 100;
+        user-select: none;
+    }
+
+    .toolbar-left, .toolbar-middle, .toolbar-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .toolbar-btn, .size-btn, .toolbar-select {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--sidebar-border);
+        color: var(--text-color);
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+        outline: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s ease;
+    }
+
+    body.vscode-light .toolbar-btn, 
+    body.vscode-light .size-btn, 
+    body.vscode-light .toolbar-select {
+        background: #ffffff;
+        border-color: rgba(0, 0, 0, 0.12);
+        color: #1f2937;
+    }
+
+    .toolbar-btn:hover, .size-btn:hover, .toolbar-select:hover {
+        background: var(--active-color);
+        color: #fff;
+        border-color: var(--active-color);
+    }
+
+    /* Mode Toggle Group */
+    .mode-toggle-group {
+        display: flex;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 6px;
+        padding: 2px;
+        border: 1px solid var(--sidebar-border);
+    }
+
+    body.vscode-light .mode-toggle-group {
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    .mode-toggle-group button {
+        background: transparent;
+        border: 0;
+        color: var(--muted-color);
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.15s ease;
+    }
+
+    .mode-toggle-group button.active {
+        background: var(--active-color);
+        color: #fff;
+    }
+
+    /* Font Size group */
+    .font-size-group {
+        display: flex;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 6px;
+        border: 1px solid var(--sidebar-border);
+        padding: 2px;
+    }
+
+    body.vscode-light .font-size-group {
+        background: #ffffff;
+        border-color: rgba(0, 0, 0, 0.12);
+    }
+
+    .font-size-group .size-btn {
+        background: transparent;
+        border: 0;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+
+    #font-size-display {
+        font-size: 11px;
+        min-width: 32px;
+        text-align: center;
+        color: var(--text-color);
+    }
+
+    body.vscode-light #font-size-display {
+        color: #1f2937;
+    }
+
+    /* Raw Editor view */
+    #raw-editor-container {
+        width: 100vw;
+        height: calc(100vh - 48px);
+        background: var(--workspace-bg);
+        box-sizing: border-box;
+        padding: 16px;
+    }
+
+    #raw-editor-textarea {
+        width: 100%;
+        height: 100%;
+        background: var(--sidebar-bg);
+        color: var(--text-color);
+        border: 1px solid var(--sidebar-border);
+        border-radius: 8px;
+        padding: 16px;
+        box-sizing: border-box;
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        resize: none;
+        outline: none;
+    }
+
+    body.vscode-light #raw-editor-textarea {
+        background: #ffffff;
+        color: #1f2937;
+        border-color: rgba(0, 0, 0, 0.12);
     }
 `;
 
-// @state: green
+// @state: red
 export class DocsSchemaRenderer implements ISchemaRenderer {
-    // @state: green
+    // @state: red
     public renderPage(webview: vscode.Webview, nonce: string) {
         return {
-            // @state: green
+            // @state: red
             render: (): string => {
                 const htmlParts: string[] = [];
 
@@ -401,6 +567,52 @@ export class DocsSchemaRenderer implements ISchemaRenderer {
                 htmlParts.push('    </style>');
                 htmlParts.push('</head>');
                 htmlParts.push('<body>');
+                
+                // 橫向工作列
+                htmlParts.push('    <div id="toolbar-header">');
+                htmlParts.push('        <div class="toolbar-left">');
+                htmlParts.push('            <button id="toggle-sidebar-btn" class="toolbar-btn" type="button" title="收起側邊欄">');
+                htmlParts.push('                <span class="btn-icon">📁</span> <span class="btn-text">側邊欄</span>');
+                htmlParts.push('            </button>');
+                htmlParts.push('            <div class="mode-toggle-group" role="tablist">');
+                htmlParts.push('                <button id="mode-render-btn" class="active" type="button" role="tab" aria-selected="true">渲染模式</button>');
+                htmlParts.push('                <button id="mode-source-btn" type="button" role="tab" aria-selected="false">原始檔模式</button>');
+                htmlParts.push('            </div>');
+                htmlParts.push('            <button id="readonly-btn" class="toolbar-btn" type="button" title="切換唯讀模式">');
+                htmlParts.push('                <span class="btn-icon">🔓</span> <span class="btn-text">編輯中</span>');
+                htmlParts.push('            </button>');
+                htmlParts.push('        </div>');
+                htmlParts.push('        <div class="toolbar-middle">');
+                htmlParts.push('            <select id="font-family-select" class="toolbar-select" title="字型樣式">');
+                htmlParts.push('                <option value="sans-serif">預設無襯線體</option>');
+                htmlParts.push('                <option value="serif">經典襯線體</option>');
+                htmlParts.push('                <option value="monospace">等寬程式碼體</option>');
+                htmlParts.push('                <option value="system-ui">系統預設 UI</option>');
+                htmlParts.push('            </select>');
+                htmlParts.push('            <div class="font-size-group">');
+                htmlParts.push('                <button id="font-dec-btn" class="size-btn" type="button" title="縮小字型">-</button>');
+                htmlParts.push('                <span id="font-size-display">14px</span>');
+                htmlParts.push('                <button id="font-inc-btn" class="size-btn" type="button" title="放大字型">+</button>');
+                htmlParts.push('            </div>');
+                htmlParts.push('            <select id="line-height-select" class="toolbar-select" title="行高設定">');
+                htmlParts.push('                <option value="1.4">1.4 (緊湊)</option>');
+                htmlParts.push('                <option value="1.55">1.55 (標準)</option>');
+                htmlParts.push('                <option value="1.65" selected>1.65 (舒適)</option>');
+                htmlParts.push('                <option value="1.8">1.8 (寬敞)</option>');
+                htmlParts.push('            </select>');
+                htmlParts.push('        </div>');
+                htmlParts.push('        <div class="toolbar-right">');
+                htmlParts.push('            <button id="full-width-btn" class="toolbar-btn" type="button" title="切換寬度">A4 比例</button>');
+                htmlParts.push('            <button id="theme-override-btn" class="toolbar-btn" type="button" title="切換主題模式">主題：跟隨系統</button>');
+                htmlParts.push('        </div>');
+                htmlParts.push('    </div>');
+
+                // 原始檔編輯區域 (預設隱藏)
+                htmlParts.push('    <div id="raw-editor-container" style="display: none;">');
+                htmlParts.push('        <textarea id="raw-editor-textarea" spellcheck="false" placeholder="在此編輯原始 Planist DSL..."></textarea>');
+                htmlParts.push('    </div>');
+
+                // 渲染與側邊欄區域
                 htmlParts.push('    <div id="app-container">');
                 htmlParts.push('        <div id="sidebar">');
                 htmlParts.push('            <div id="doc-title-container">');
@@ -419,6 +631,7 @@ export class DocsSchemaRenderer implements ISchemaRenderer {
                 htmlParts.push('            <div id="document-scroll-container"></div>');
                 htmlParts.push('        </main>');
                 htmlParts.push('    </div>');
+                
                 htmlParts.push(`    <script nonce="${nonce}">`);
                 htmlParts.push(DocsSchemaJS);
                 htmlParts.push('    </script>');

@@ -220,6 +220,23 @@ export function getOrCreatePreviewPanel(context: vscode.ExtensionContext, indexe
                 await document.save();
             }
         }
+        if (message?.command === 'updateDocumentText' && typeof message.text === 'string') {
+            const editor = vscode.window.activeTextEditor;
+            if (editor && editor.document) {
+                if (getDocumentTrafficState(editor.document) === 'green') {
+                    vscode.window.showWarningMessage('🚨 [Planist 衛兵] 該模組目前處於綠燈 (Stable) 狀態，禁止任何非物理性修改！');
+                    return;
+                }
+
+                const edit = new vscode.WorkspaceEdit();
+                const entireRange = new vscode.Range(
+                    editor.document.positionAt(0),
+                    editor.document.positionAt(editor.document.getText().length)
+                );
+                edit.replace(editor.document.uri, entireRange, message.text);
+                await vscode.workspace.applyEdit(edit);
+            }
+        }
     });
 
     context.subscriptions.push(currentPreviewPanel);

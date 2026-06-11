@@ -14,6 +14,7 @@
   "activationEvents": [
     "onCommand:planist.createFlowFile",
     "onCommand:planist.createDocsFile",
+    "onCommand:planist.createUIDesignFile",
     "onCommand:planist.configureAppearance",
     "onCommand:planist-vscode.switchViewMode",
     "onCommand:planist-vscode.previewFlow",
@@ -64,6 +65,11 @@
       {
         "command": "planist.createDocsFile",
         "title": "Create Docs File",
+        "category": "Planist"
+      },
+      {
+        "command": "planist.createUIDesignFile",
+        "title": "Create UI Design File",
         "category": "Planist"
       }
     ],

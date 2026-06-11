@@ -81,6 +81,10 @@ export async function activate(context: vscode.ExtensionContext) {
 		void CommandController.handleCreateDocsFile();
 	});
 
+	const createUIDesignFile = vscode.commands.registerCommand('planist.createUIDesignFile', () => {
+		void CommandController.handleCreateUIDesignFile();
+	});
+
 	const previewFlow = vscode.commands.registerCommand('planist-vscode.previewFlow', async () => {
 		const panel = getOrCreatePreviewPanel(context, indexer);
 		panel.reveal(vscode.ViewColumn.Beside, true);
@@ -185,6 +189,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		configureAppearance,
 		createFlowFile,
 		createDocsFile,
+		createUIDesignFile,
 		previewFlow,
 		switchViewMode,
 		flowDefProvider,

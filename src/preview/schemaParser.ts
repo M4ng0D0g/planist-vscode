@@ -6,14 +6,21 @@ import {
 export interface DesignConfig {
 	[key: string]: string | number;
 }
-export interface DesignPanel {
+export interface UIComponent {
+	type: string;
 	name: string;
 	properties: { [key: string]: string | number };
+	children: UIComponent[];
+}
+export interface UITemplate {
+	name: string;
+	rootComponent: UIComponent;
 }
 export interface DesignSchemaData {
 	themeName: string;
 	config: DesignConfig;
-	panels: DesignPanel[];
+	panels: UIComponent[];
+	templates: UITemplate[];
 }
 
 export interface TaskItem {
@@ -102,15 +109,15 @@ function parseDesignSchema(text: string): DesignSchemaData {
 	const lines = text.split(/\r?\n/);
 	let themeName = '';
 	const config: DesignConfig = {};
-	const panels: DesignPanel[] = [];
+	const panels: UIComponent[] = [];
+	const templates: UITemplate[] = [];
 
 	const schemaMatch = text.match(/^\s*#schema\s+design\s+([A-Za-z0-9_-]+)/i);
 	if (schemaMatch) {
 		themeName = schemaMatch[1];
 	}
 
-	let currentBlock: { type: 'config' | 'panel'; name?: string } | null = null;
-	let blockProperties: { [key: string]: string | number } = {};
+	const stack: any[] = [];
 
 	for (const line of lines) {
 		const trimmed = line.trim();
@@ -118,51 +125,84 @@ function parseDesignSchema(text: string): DesignSchemaData {
 			continue;
 		}
 
-		if (trimmed.startsWith('config {')) {
-			currentBlock = { type: 'config' };
-			blockProperties = {};
+		if (trimmed === 'config {') {
+			stack.push({ type: 'config', properties: {} });
 			continue;
 		}
 
-		const panelMatch = trimmed.match(/^panel\s+([A-Za-z0-9_-]+)\s*\{/i);
-		if (panelMatch) {
-			currentBlock = { type: 'panel', name: panelMatch[1] };
-			blockProperties = {};
+		const templateMatch = trimmed.match(/^template\s+([A-Za-z0-9_-]+)\s*\{/i);
+		if (templateMatch) {
+			stack.push({ type: 'template', name: templateMatch[1], rootComponent: null });
+			continue;
+		}
+
+		const compMatch = trimmed.match(/^([A-Za-z0-9_-]+)\s+([A-Za-z0-9_-]+)\s*\{/i);
+		if (compMatch) {
+			const compType = compMatch[1];
+			const compName = compMatch[2];
+			const newComp: UIComponent = {
+				type: compType,
+				name: compName,
+				properties: {},
+				children: []
+			};
+
+			const parent = stack[stack.length - 1];
+			if (parent) {
+				if (parent.type === 'template') {
+					if (!parent.rootComponent) {
+						parent.rootComponent = newComp;
+					} else {
+						parent.rootComponent.children.push(newComp);
+					}
+				} else if (parent.children) {
+					parent.children.push(newComp);
+				}
+			}
+
+			stack.push(newComp);
 			continue;
 		}
 
 		if (trimmed === '}') {
-			if (currentBlock) {
-				if (currentBlock.type === 'config') {
-					Object.assign(config, blockProperties);
-				} else if (currentBlock.type === 'panel' && currentBlock.name) {
-					panels.push({
-						name: currentBlock.name,
-						properties: blockProperties
+			const popped = stack.pop();
+			if (popped) {
+				if (popped.type === 'config') {
+					Object.assign(config, popped.properties);
+				} else if (popped.type === 'template') {
+					templates.push({
+						name: popped.name,
+						rootComponent: popped.rootComponent || { type: 'stackPanel', name: 'Empty', properties: {}, children: [] }
 					});
+				} else if (stack.length === 0) {
+					panels.push(popped);
 				}
-				currentBlock = null;
 			}
 			continue;
 		}
 
-		if (currentBlock) {
-			const propMatch = trimmed.match(/^([A-Za-z0-9_-]+)\s*:\s*(.+)$/);
-			if (propMatch) {
-				const key = propMatch[1];
-				let valStr = propMatch[2].replace(/,$/, '').trim();
-				// Strip quotes if string
-				if (valStr.startsWith('"') && valStr.endsWith('"')) {
-					valStr = valStr.substring(1, valStr.length - 1);
+		const propMatch = trimmed.match(/^([A-Za-z0-9_\.-]+)\s*:\s*(.+)$/);
+		if (propMatch) {
+			const key = propMatch[1];
+			let valStr = propMatch[2].replace(/,$/, '').trim();
+			if (valStr.startsWith('"') && valStr.endsWith('"')) {
+				valStr = valStr.substring(1, valStr.length - 1);
+			}
+			const numVal = Number(valStr);
+			const finalVal = isNaN(numVal) ? valStr : numVal;
+
+			const current = stack[stack.length - 1];
+			if (current) {
+				if (current.type === 'config') {
+					current.properties[key] = finalVal;
+				} else if (current.properties) {
+					current.properties[key] = finalVal;
 				}
-				// Parse number if applicable
-				const numVal = Number(valStr);
-				blockProperties[key] = isNaN(numVal) ? valStr : numVal;
 			}
 		}
 	}
 
-	return { themeName, config, panels };
+	return { themeName, config, panels, templates };
 }
 
 function parseTaskSchema(text: string): TaskSchemaData {

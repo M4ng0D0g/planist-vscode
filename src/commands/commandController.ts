@@ -90,6 +90,56 @@ Use the page separator above whenever you want a new Word-like page.
 		}
 	}
 
+	// @state: yellow
+	public static async handleCreateUIDesignFile(): Promise<void> {
+		const fileUri = await promptPlanistFilePath('Create UI Design File', 'new-ui.pln');
+		if (!fileUri) {
+			return;
+		}
+
+		const baseName = path.basename(fileUri.fsPath, '.pln');
+		const safeName = baseName.replace(/[^a-zA-Z0-9_-]/g, '') || 'Untitled';
+
+		const template = `#schema design ${safeName}
+
+config {
+    background: "grid"
+    primaryColor: "#3b82f6"
+    backgroundColor: "#111827"
+}
+
+panel MainWindow {
+    width: 800
+    height: 600
+    grid RootGrid {
+        rows: "auto, *"
+        columns: "*"
+        
+        stackPanel Header {
+            grid.row: 0
+            orientation: "horizontal"
+            padding: 12
+            backgroundColor: "#1f2937"
+            
+            textBlock Title {
+                text: "My Application"
+                fontSize: 16
+            }
+        }
+    }
+}
+`;
+
+		try {
+			fs.mkdirSync(path.dirname(fileUri.fsPath), { recursive: true });
+			fs.writeFileSync(fileUri.fsPath, template, 'utf8');
+			const doc = await vscode.workspace.openTextDocument(fileUri);
+			await vscode.window.showTextDocument(doc);
+		} catch (err: any) {
+			vscode.window.showErrorMessage(`Failed to create UI design file: ${err?.message || err}`);
+		}
+	}
+
 	// @state: green
 	public static async handleConfigureAppearance(): Promise<void> {
 		const currentConfig = await loadPlanistConfig();
@@ -165,7 +215,7 @@ Use the page separator above whenever you want a new Word-like page.
 	}
 }
 
-// @state: green
+// @state: red
 async function promptPlanistFilePath(title: string, defaultFileName: string): Promise<vscode.Uri | undefined> {
 	const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
 	let rootUri: vscode.Uri | undefined;
@@ -186,25 +236,111 @@ async function promptPlanistFilePath(title: string, defaultFileName: string): Pr
 		rootUri = selected?.uri;
 	}
 
-	const input = await vscode.window.showInputBox({
-		prompt: rootUri
-			? `${title}: enter a .pln path relative to ${path.basename(rootUri.fsPath)}`
-			: `${title}: enter an absolute .pln file path`,
+	// 1. Ask for file name first
+	const fileNameInput = await vscode.window.showInputBox({
+		prompt: `${title}: enter a file name`,
 		value: defaultFileName,
-		placeHolder: rootUri ? `flows/${defaultFileName}` : `C:\\Projects\\${defaultFileName}`,
-		validateInput: value => validatePlanistFilePath(value, rootUri),
+		placeHolder: defaultFileName,
+		validateInput: value => {
+			const trimmed = value.trim();
+			if (!trimmed) {
+				return 'Enter a file name.';
+			}
+			if (/[<>:"|?*/\\]/.test(trimmed)) {
+				return 'The file name contains invalid characters.';
+			}
+			return undefined;
+		}
 	});
 
-	if (!input) {
+	if (!fileNameInput) {
 		return undefined;
 	}
 
-	const normalizedInput = ensurePlanistExtension(input.trim());
+	const fileName = ensurePlanistExtension(fileNameInput.trim());
+
+	// 2. Select folder location
 	if (!rootUri) {
-		return vscode.Uri.file(path.resolve(normalizedInput));
+		// Fallback if no workspace folder is open
+		const absInput = await vscode.window.showInputBox({
+			prompt: `${title}: Enter absolute directory path to create the file in`,
+			placeHolder: 'C:\\Projects',
+		});
+		if (!absInput) {
+			return undefined;
+		}
+		return vscode.Uri.file(path.resolve(absInput.trim(), fileName));
 	}
 
-	return vscode.Uri.file(path.resolve(rootUri.fsPath, normalizedInput));
+	const folderUri = await promptDirectorySelection(title, rootUri);
+	if (!folderUri) {
+		return undefined;
+	}
+
+	return vscode.Uri.file(path.resolve(folderUri.fsPath, fileName));
+}
+
+// @state: yellow
+async function promptDirectorySelection(title: string, rootUri: vscode.Uri): Promise<vscode.Uri | undefined> {
+	let currentDir = rootUri.fsPath;
+
+	while (true) {
+		const items: { label: string; description?: string; isDir: boolean; path: string }[] = [];
+		const relPath = path.relative(rootUri.fsPath, currentDir) || '.';
+
+		// Option to select the current directory
+		items.push({
+			label: `📁 Select this folder: ${relPath}`,
+			isDir: false,
+			path: currentDir,
+		});
+
+		// Parent directory option if not at the rootUri
+		if (currentDir !== rootUri.fsPath) {
+			items.push({
+				label: '📁 .. (Up)',
+				isDir: true,
+				path: path.dirname(currentDir),
+			});
+		}
+
+		// List subfolders
+		try {
+			const files = fs.readdirSync(currentDir, { withFileTypes: true });
+			const folders = files
+				.filter(file => file.isDirectory() && !file.name.startsWith('.'))
+				.sort((a, b) => a.name.localeCompare(b.name));
+
+			folders.forEach(f => {
+				const fullPath = path.join(currentDir, f.name);
+				const rel = path.relative(rootUri.fsPath, fullPath);
+				items.push({
+					label: `📁 ${f.name}/`,
+					description: rel,
+					isDir: true,
+					path: fullPath,
+				});
+			});
+		} catch (e) {
+			vscode.window.showErrorMessage(`Failed to read folder: ${e}`);
+			return undefined;
+		}
+
+		const selected = await vscode.window.showQuickPick(items, {
+			placeHolder: `${title}: Choose folder location (currently: ${relPath})`,
+			ignoreFocusOut: true,
+		});
+
+		if (!selected) {
+			return undefined;
+		}
+
+		if (selected.isDir) {
+			currentDir = selected.path;
+		} else {
+			return vscode.Uri.file(selected.path);
+		}
+	}
 }
 
 // @state: green

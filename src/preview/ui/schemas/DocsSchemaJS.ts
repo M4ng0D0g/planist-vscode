@@ -1,4 +1,4 @@
-// @state: green
+// @state: red
 export const DocsSchemaJS = String.raw`
 (function() {
     const vscode = acquireVsCodeApi();
@@ -7,6 +7,15 @@ export const DocsSchemaJS = String.raw`
     let editingIndex = null;
     let activePageIndex = 0;
 
+    let rawDocText = '';
+    let currentMode = 'render';
+    let isReadonly = false;
+    let currentFontFamily = 'sans-serif';
+    let currentFontSize = 14;
+    let currentLineHeight = '1.65';
+    let isFullWidth = false;
+    let themeOverride = 'system';
+
     const docTitle = document.getElementById('doc-title');
     const tabDir = document.getElementById('tab-dir');
     const tabOutline = document.getElementById('tab-outline');
@@ -14,6 +23,23 @@ export const DocsSchemaJS = String.raw`
     const scrollContainer = document.getElementById('content-viewport');
     const docsContainer = document.getElementById('document-scroll-container');
     const addPageBtn = document.getElementById('add-page-btn');
+
+    const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
+    const sidebar = document.getElementById('sidebar');
+    const modeRenderBtn = document.getElementById('mode-render-btn');
+    const modeSourceBtn = document.getElementById('mode-source-btn');
+    const readonlyBtn = document.getElementById('readonly-btn');
+    const fontFamilySelect = document.getElementById('font-family-select');
+    const fontDecBtn = document.getElementById('font-dec-btn');
+    const fontSizeDisplay = document.getElementById('font-size-display');
+    const fontIncBtn = document.getElementById('font-inc-btn');
+    const lineHeightSelect = document.getElementById('line-height-select');
+    const fullWidthBtn = document.getElementById('full-width-btn');
+    const themeOverrideBtn = document.getElementById('theme-override-btn');
+    
+    const rawEditorContainer = document.getElementById('raw-editor-container');
+    const rawEditorTextarea = document.getElementById('raw-editor-textarea');
+    const appContainer = document.getElementById('app-container');
 
     tabDir.addEventListener('click', function() {
         activeTab = 'dir';
@@ -38,11 +64,124 @@ export const DocsSchemaJS = String.raw`
         if (message.command === 'updateSchemaData' && message.schema === 'docs') {
             docTitle.textContent = message.data.docName || 'Untitled Document';
             localPages = Array.isArray(message.data.pages) ? message.data.pages : [];
+            rawDocText = message.text || '';
             if (activePageIndex >= localPages.length) {
                 activePageIndex = Math.max(localPages.length - 1, 0);
             }
             renderSidebar();
             renderPages();
+        }
+    });
+
+    // Toolbar Event Listeners
+    toggleSidebarBtn.addEventListener('click', function() {
+        sidebar.classList.toggle('collapsed');
+    });
+
+    modeSourceBtn.addEventListener('click', function() {
+        if (currentMode === 'render') {
+            currentMode = 'source';
+            modeSourceBtn.classList.add('active');
+            modeRenderBtn.classList.remove('active');
+            modeSourceBtn.setAttribute('aria-selected', 'true');
+            modeRenderBtn.setAttribute('aria-selected', 'false');
+            appContainer.style.display = 'none';
+            rawEditorContainer.style.display = 'block';
+            rawEditorTextarea.value = rawDocText;
+        }
+    });
+
+    modeRenderBtn.addEventListener('click', function() {
+        if (currentMode === 'source') {
+            currentMode = 'render';
+            modeRenderBtn.classList.add('active');
+            modeSourceBtn.classList.remove('active');
+            modeRenderBtn.setAttribute('aria-selected', 'true');
+            modeSourceBtn.setAttribute('aria-selected', 'false');
+            rawEditorContainer.style.display = 'none';
+            appContainer.style.display = 'flex';
+            rawDocText = rawEditorTextarea.value;
+            vscode.postMessage({ command: 'updateRawText', text: rawDocText });
+        }
+    });
+
+    readonlyBtn.addEventListener('click', function() {
+        isReadonly = !isReadonly;
+        if (isReadonly) {
+            readonlyBtn.innerHTML = '<span class="btn-icon">🔒</span> <span class="btn-text">唯讀</span>';
+            readonlyBtn.title = '唯讀模式，點擊切換為編輯模式';
+        } else {
+            readonlyBtn.innerHTML = '<span class="btn-icon">🔓</span> <span class="btn-text">編輯中</span>';
+            readonlyBtn.title = '編輯模式，點擊切換為唯讀模式';
+        }
+        renderSidebar();
+        renderPages();
+    });
+
+    fontFamilySelect.addEventListener('change', function() {
+        currentFontFamily = fontFamilySelect.value;
+        let fontVal = '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+        if (currentFontFamily === 'serif') {
+            fontVal = 'Georgia, "Times New Roman", serif';
+        } else if (currentFontFamily === 'monospace') {
+            fontVal = 'ui-monospace, SFMono-Regular, Consolas, monospace';
+        } else if (currentFontFamily === 'system-ui') {
+            fontVal = 'system-ui, sans-serif';
+        }
+        document.documentElement.style.setProperty('--paper-font-family', fontVal);
+    });
+
+    fontDecBtn.addEventListener('click', function() {
+        if (currentFontSize > 10) {
+            currentFontSize -= 1;
+            fontSizeDisplay.textContent = currentFontSize + 'px';
+            document.documentElement.style.setProperty('--paper-font-size', currentFontSize + 'px');
+        }
+    });
+
+    fontIncBtn.addEventListener('click', function() {
+        if (currentFontSize < 32) {
+            currentFontSize += 1;
+            fontSizeDisplay.textContent = currentFontSize + 'px';
+            document.documentElement.style.setProperty('--paper-font-size', currentFontSize + 'px');
+        }
+    });
+
+    lineHeightSelect.addEventListener('change', function() {
+        currentLineHeight = lineHeightSelect.value;
+        document.documentElement.style.setProperty('--paper-line-height', currentLineHeight);
+    });
+
+    fullWidthBtn.addEventListener('click', function() {
+        isFullWidth = !isFullWidth;
+        if (isFullWidth) {
+            fullWidthBtn.textContent = '全寬模式';
+            document.documentElement.style.setProperty('--paper-width', '95%');
+        } else {
+            fullWidthBtn.textContent = 'A4 比例';
+            document.documentElement.style.setProperty('--paper-width', '794px');
+        }
+    });
+
+    themeOverrideBtn.addEventListener('click', function() {
+        if (themeOverride === 'system') {
+            themeOverride = 'light';
+            themeOverrideBtn.textContent = '主題：強制淺色';
+            document.documentElement.style.setProperty('--theme-paper-bg', '#ffffff');
+            document.documentElement.style.setProperty('--theme-paper-text', '#202124');
+            document.documentElement.style.setProperty('--theme-paper-border', '#d4d4d8');
+        } else if (themeOverride === 'light') {
+            themeOverride = 'dark';
+            themeOverrideBtn.textContent = '主題：強制深色';
+            document.documentElement.style.setProperty('--theme-paper-bg', '#1e1e1e');
+            document.documentElement.style.setProperty('--theme-paper-text', '#e5e7eb');
+            document.documentElement.style.setProperty('--theme-paper-border', 'rgba(255,255,255,0.15)');
+        } else {
+            themeOverride = 'system';
+            themeOverrideBtn.textContent = '主題：跟隨系統';
+            document.documentElement.style.setProperty('--theme-paper-bg', 'var(--paper-bg)');
+            document.documentElement.style.setProperty('--theme-paper-text', 'var(--paper-text)');
+            document.documentElement.style.setProperty('--theme-paper-border', 'var(--paper-border)');
         }
     });
 
@@ -216,6 +355,7 @@ export const DocsSchemaJS = String.raw`
                     updates: { isOutline: !page.isOutline }
                 });
             });
+            outlineIndicator.style.display = isReadonly ? 'none' : 'inline-block';
             item.appendChild(outlineIndicator);
 
             item.addEventListener('click', function() {
@@ -224,6 +364,7 @@ export const DocsSchemaJS = String.raw`
 
             sidebarList.appendChild(item);
         });
+        addPageBtn.style.display = isReadonly ? 'none' : 'block';
     }
 
     // @state: green
@@ -304,7 +445,7 @@ export const DocsSchemaJS = String.raw`
         sheet.appendChild(actions);
     }
 
-    // @state: green
+    // @state: red
     function renderPreview(sheet, page, idx) {
         const hud = document.createElement('div');
         hud.className = 'page-header-hud';
@@ -351,6 +492,10 @@ export const DocsSchemaJS = String.raw`
             }
         });
         hud.appendChild(deleteBtn);
+        
+        if (isReadonly) {
+            hud.style.display = 'none';
+        }
         sheet.appendChild(hud);
 
         const body = document.createElement('div');

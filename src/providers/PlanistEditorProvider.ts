@@ -5,7 +5,7 @@ import { prepareGraphData } from '../preview/graphDataProvider';
 import { parseSchemaDocument, parseDocsSchema, DocsSchemaData } from '../preview/schemaParser';
 import { FlowIndexer } from '../indexing/flowIndexer';
 
-// @state: green
+// @state: red
 export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
     public static readonly viewType = 'planist.flowEditor';
 
@@ -15,7 +15,7 @@ export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
         private readonly indexer: FlowIndexer
     ) {}
 
-    // @state: green
+    // @state: red
     public async resolveCustomTextEditor(
         document: vscode.TextDocument,
         webviewPanel: vscode.WebviewPanel,
@@ -69,7 +69,8 @@ export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
                 await webviewPanel.webview.postMessage({
                     command: 'updateSchemaData',
                     schema,
-                    data
+                    data,
+                    text
                 });
             }
         };
@@ -262,6 +263,18 @@ export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
                     edit.replace(document.uri, range, newDsl);
                     await vscode.workspace.applyEdit(edit);
                 }
+            }
+            if (message.command === 'updateRawText' && typeof message.text === 'string') {
+                if (this.getDocumentTrafficState(document) === 'green') {
+                    vscode.window.showWarningMessage('🚨 [Planist 衛兵] 該模組目前處於綠燈 (Stable) 狀態，禁止 any 非物理性修改！');
+                    return;
+                }
+                const edit = new vscode.WorkspaceEdit();
+                const lastLine = document.lineCount - 1;
+                const lastChar = document.lineAt(lastLine).text.length;
+                const range = new vscode.Range(new vscode.Position(0, 0), new vscode.Position(lastLine, lastChar));
+                edit.replace(document.uri, range, message.text);
+                await vscode.workspace.applyEdit(edit);
             }
         });
 
