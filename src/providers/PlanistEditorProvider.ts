@@ -15,12 +15,21 @@ export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
         private readonly indexer: FlowIndexer
     ) {}
 
-    // @state: yellow
+    // @state: red
     public async resolveCustomTextEditor(
         document: vscode.TextDocument,
         webviewPanel: vscode.WebviewPanel,
         token: vscode.CancellationToken
     ): Promise<void> {
+        // Check if the file is empty and doesn't specify a schema
+        const text = document.getText().trim();
+        const hasSchema = /^\s*#schema\s+/i.test(text);
+        if (text.length === 0 && !hasSchema) {
+            webviewPanel.dispose();
+            await vscode.commands.executeCommand('vscode.openWith', document.uri, 'default');
+            return;
+        }
+
         webviewPanel.webview.options = {
             enableScripts: true,
             localResourceRoots: [
@@ -283,7 +292,7 @@ export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
         return 'flow';
     }
 
-    // @state: yellow
+    // @state: red
     private async updateDocsPageInDocument(
         document: vscode.TextDocument,
         pageIndex: number,
@@ -310,7 +319,7 @@ export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
         await vscode.workspace.applyEdit(edit);
     }
 
-    // @state: yellow
+    // @state: red
     private serializeDocsData(data: DocsSchemaData): string {
         const blocks: string[] = [];
         blocks.push(`#schema docs ${data.docName}`);

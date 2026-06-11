@@ -11,6 +11,14 @@
     "Other"
   ],
   "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:planist.createFlowFile",
+    "onCommand:planist.createDocsFile",
+    "onCommand:planist.configureAppearance",
+    "onCommand:planist-vscode.switchViewMode",
+    "onCommand:planist-vscode.previewFlow",
+    "onCustomEditor:planist.flowEditor"
+  ],
   "contributes": {
     "languages": [
       {

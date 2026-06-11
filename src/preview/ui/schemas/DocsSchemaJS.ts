@@ -1,4 +1,4 @@
-// @state: yellow
+// @state: red
 export const DocsSchemaJS = String.raw`
 (function() {
     const vscode = acquireVsCodeApi();
@@ -46,7 +46,7 @@ export const DocsSchemaJS = String.raw`
         }
     });
 
-    // @state: yellow
+    // @state: red
     function escapeHtml(value) {
         return String(value || '')
             .replace(/&/g, '&amp;')
@@ -56,7 +56,7 @@ export const DocsSchemaJS = String.raw`
             .replace(/'/g, '&#039;');
     }
 
-    // @state: yellow
+    // @state: red
     function parseInlineMarkdown(text) {
         return escapeHtml(text)
             .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -66,7 +66,7 @@ export const DocsSchemaJS = String.raw`
             .replace(/\`(.+?)\`/g, '<code>$1</code>');
     }
 
-    // @state: yellow
+    // @state: red
     function closeOpenBlocks(state, html) {
         if (state.inList) {
             html.push('</ul>');
@@ -82,7 +82,7 @@ export const DocsSchemaJS = String.raw`
         }
     }
 
-    // @state: yellow
+    // @state: red
     function parseMarkdown(text) {
         const lines = String(text || '').split('\n');
         const html = [];
@@ -161,7 +161,7 @@ export const DocsSchemaJS = String.raw`
         return html.join('\n');
     }
 
-    // @state: yellow
+    // @state: red
     function visiblePageIndexes() {
         return localPages
             .map(function(page, idx) {
@@ -172,7 +172,7 @@ export const DocsSchemaJS = String.raw`
             });
     }
 
-    // @state: yellow
+    // @state: red
     function renderSidebar() {
         sidebarList.innerHTML = '';
         const entries = visiblePageIndexes();
@@ -226,7 +226,7 @@ export const DocsSchemaJS = String.raw`
         });
     }
 
-    // @state: yellow
+    // @state: red
     function scrollToPage(index) {
         const sheet = document.getElementById('page-sheet-' + index);
         if (sheet) {
@@ -236,7 +236,7 @@ export const DocsSchemaJS = String.raw`
         }
     }
 
-    // @state: yellow
+    // @state: red
     function renderPages() {
         docsContainer.innerHTML = '';
 
@@ -256,7 +256,7 @@ export const DocsSchemaJS = String.raw`
         });
     }
 
-    // @state: yellow
+    // @state: red
     function renderEditor(sheet, page, idx) {
         const titleInput = document.createElement('input');
         titleInput.type = 'text';
@@ -304,7 +304,7 @@ export const DocsSchemaJS = String.raw`
         sheet.appendChild(actions);
     }
 
-    // @state: yellow
+    // @state: red
     function renderPreview(sheet, page, idx) {
         const hud = document.createElement('div');
         hud.className = 'page-header-hud';
@@ -364,7 +364,7 @@ export const DocsSchemaJS = String.raw`
         sheet.appendChild(pageNum);
     }
 
-    // @state: yellow
+    // @state: red
     function syncActivePageFromScroll() {
         const sheets = Array.from(document.querySelectorAll('.paper-page'));
         if (sheets.length === 0) {

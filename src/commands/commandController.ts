@@ -15,7 +15,7 @@ import {
 } from '../config/planistConfig';
 
 export class CommandController {
-	// @state: yellow
+	// @state: red
 	public static async handleCreateFlowFile(): Promise<void> {
 		const fileUri = await promptPlanistFilePath('Create Flow File', 'new-flow.pln');
 		if (!fileUri) {
@@ -51,7 +51,7 @@ class Done {
 		}
 	}
 
-	// @state: yellow
+	// @state: red
 	public static async handleCreateDocsFile(): Promise<void> {
 		const fileUri = await promptPlanistFilePath('Create Docs File', 'new-docs.pln');
 		if (!fileUri) {
@@ -90,7 +90,7 @@ Use the page separator above whenever you want a new Word-like page.
 		}
 	}
 
-	// @state: yellow
+	// @state: red
 	public static async handleConfigureAppearance(): Promise<void> {
 		const currentConfig = await loadPlanistConfig();
 		const backgroundColor = await promptInput('Background color (RGB/RGBA/Hex)', currentConfig.appearance.backgroundColor);
@@ -165,7 +165,7 @@ Use the page separator above whenever you want a new Word-like page.
 	}
 }
 
-// @state: yellow
+// @state: red
 async function promptPlanistFilePath(title: string, defaultFileName: string): Promise<vscode.Uri | undefined> {
 	const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
 	let rootUri: vscode.Uri | undefined;
@@ -207,7 +207,7 @@ async function promptPlanistFilePath(title: string, defaultFileName: string): Pr
 	return vscode.Uri.file(path.resolve(rootUri.fsPath, normalizedInput));
 }
 
-// @state: yellow
+// @state: red
 function validatePlanistFilePath(value: string, rootUri: vscode.Uri | undefined): string | undefined {
 	const trimmed = value.trim();
 	if (!trimmed) {
@@ -238,12 +238,12 @@ function validatePlanistFilePath(value: string, rootUri: vscode.Uri | undefined)
 	return undefined;
 }
 
-// @state: yellow
+// @state: red
 function ensurePlanistExtension(filePath: string): string {
 	return path.extname(filePath) ? filePath : `${filePath}.pln`;
 }
 
-// @state: yellow
+// @state: red
 async function promptInput(label: string, defaultValue: string): Promise<string | undefined> {
 	return vscode.window.showInputBox({
 		prompt: label,
@@ -251,7 +251,7 @@ async function promptInput(label: string, defaultValue: string): Promise<string 
 	});
 }
 
-// @state: yellow
+// @state: red
 async function promptNumber(label: string, defaultValue: number): Promise<number | undefined> {
 	while (true) {
 		const input = await vscode.window.showInputBox({
@@ -271,7 +271,7 @@ async function promptNumber(label: string, defaultValue: number): Promise<number
 	}
 }
 
-// @state: yellow
+// @state: red
 async function promptPattern(defaultValue: PlanistBackgroundPattern): Promise<PlanistBackgroundPattern | undefined> {
 	const selected = await vscode.window.showQuickPick(
 		[
@@ -287,7 +287,7 @@ async function promptPattern(defaultValue: PlanistBackgroundPattern): Promise<Pl
 	return selected?.value ?? defaultValue;
 }
 
-// @state: yellow
+// @state: red
 async function buildDotsConfig(currentConfig: Awaited<ReturnType<typeof loadPlanistConfig>>) {
 	const color = await promptInput('Dot color', currentConfig.appearance.dots.color);
 	if (!color) {
@@ -307,7 +307,7 @@ async function buildDotsConfig(currentConfig: Awaited<ReturnType<typeof loadPlan
 	};
 }
 
-// @state: yellow
+// @state: red
 async function buildGridConfig(currentConfig: Awaited<ReturnType<typeof loadPlanistConfig>>) {
 	const majorColor = await promptInput('Major grid color', currentConfig.appearance.grid.majorColor);
 	if (!majorColor) {
