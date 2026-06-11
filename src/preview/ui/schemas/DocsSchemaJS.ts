@@ -4,17 +4,15 @@ export const DocsSchemaJS = String.raw`
     const vscode = acquireVsCodeApi();
     let localPages = [];
     let activeTab = 'dir';
-    let editingIndex = null;
     let activePageIndex = 0;
 
     let rawDocText = '';
     let currentMode = 'render';
     let isReadonly = false;
     let currentFontFamily = 'sans-serif';
-    let currentFontSize = 14;
-    let currentLineHeight = '1.65';
     let isFullWidth = false;
     let themeOverride = 'system';
+    let isSnapping = false;
 
     const docTitle = document.getElementById('doc-title');
     const tabDir = document.getElementById('tab-dir');
@@ -30,16 +28,40 @@ export const DocsSchemaJS = String.raw`
     const modeSourceBtn = document.getElementById('mode-source-btn');
     const readonlyBtn = document.getElementById('readonly-btn');
     const fontFamilySelect = document.getElementById('font-family-select');
-    const fontDecBtn = document.getElementById('font-dec-btn');
-    const fontSizeDisplay = document.getElementById('font-size-display');
-    const fontIncBtn = document.getElementById('font-inc-btn');
-    const lineHeightSelect = document.getElementById('line-height-select');
     const fullWidthBtn = document.getElementById('full-width-btn');
     const themeOverrideBtn = document.getElementById('theme-override-btn');
     
     const rawEditorContainer = document.getElementById('raw-editor-container');
     const rawEditorTextarea = document.getElementById('raw-editor-textarea');
     const appContainer = document.getElementById('app-container');
+
+    const styleBtn = document.getElementById('style-btn');
+    const styleMenu = document.getElementById('style-menu');
+    const formatToolbar = document.getElementById('format-toolbar');
+    const colorBtn = document.getElementById('color-btn');
+    const colorDropdown = document.getElementById('color-dropdown');
+    const highlightBtn = document.getElementById('highlight-btn');
+    const highlightDropdown = document.getElementById('highlight-dropdown');
+
+    const colors = [
+        { name: 'Red', hex: '#ef4444' },
+        { name: 'Orange', hex: '#f97316' },
+        { name: 'Yellow', hex: '#eab308' },
+        { name: 'Green', hex: '#22c55e' },
+        { name: 'Blue', hex: '#3b82f6' },
+        { name: 'Purple', hex: '#a855f7' },
+        { name: 'Default', hex: '#71717a' }
+    ];
+
+    const highlights = [
+        { name: 'Red', hex: '#fee2e2' },
+        { name: 'Orange', hex: '#ffedd5' },
+        { name: 'Yellow', hex: '#fef9c3' },
+        { name: 'Green', hex: '#dcfce7' },
+        { name: 'Blue', hex: '#dbeafe' },
+        { name: 'Purple', hex: '#f3e8ff' },
+        { name: 'Gray', hex: '#f4f4f5' }
+    ];
 
     tabDir.addEventListener('click', function() {
         activeTab = 'dir';
@@ -69,7 +91,13 @@ export const DocsSchemaJS = String.raw`
                 activePageIndex = Math.max(localPages.length - 1, 0);
             }
             renderSidebar();
-            renderPages();
+            
+            // Avoid re-rendering pages if currently editing to preserve cursor position
+            const activeEl = document.activeElement;
+            const isEditing = activeEl && (activeEl.classList.contains('editor-title-input') || activeEl.classList.contains('editor-textarea'));
+            if (!isEditing) {
+                renderPages();
+            }
         }
     });
 
@@ -107,11 +135,12 @@ export const DocsSchemaJS = String.raw`
 
     readonlyBtn.addEventListener('click', function() {
         isReadonly = !isReadonly;
+        const icon = document.getElementById('readonly-icon');
         if (isReadonly) {
-            readonlyBtn.innerHTML = '<span class="btn-icon">🔒</span> <span class="btn-text">唯讀</span>';
+            if (icon) icon.textContent = '🔒';
             readonlyBtn.title = '唯讀模式，點擊切換為編輯模式';
         } else {
-            readonlyBtn.innerHTML = '<span class="btn-icon">🔓</span> <span class="btn-text">編輯中</span>';
+            if (icon) icon.textContent = '🔓';
             readonlyBtn.title = '編輯模式，點擊切換為唯讀模式';
         }
         renderSidebar();
@@ -129,27 +158,6 @@ export const DocsSchemaJS = String.raw`
             fontVal = 'system-ui, sans-serif';
         }
         document.documentElement.style.setProperty('--paper-font-family', fontVal);
-    });
-
-    fontDecBtn.addEventListener('click', function() {
-        if (currentFontSize > 10) {
-            currentFontSize -= 1;
-            fontSizeDisplay.textContent = currentFontSize + 'px';
-            document.documentElement.style.setProperty('--paper-font-size', currentFontSize + 'px');
-        }
-    });
-
-    fontIncBtn.addEventListener('click', function() {
-        if (currentFontSize < 32) {
-            currentFontSize += 1;
-            fontSizeDisplay.textContent = currentFontSize + 'px';
-            document.documentElement.style.setProperty('--paper-font-size', currentFontSize + 'px');
-        }
-    });
-
-    lineHeightSelect.addEventListener('change', function() {
-        currentLineHeight = lineHeightSelect.value;
-        document.documentElement.style.setProperty('--paper-line-height', currentLineHeight);
     });
 
     fullWidthBtn.addEventListener('click', function() {
@@ -185,6 +193,169 @@ export const DocsSchemaJS = String.raw`
         }
     });
 
+    // Color Pickers Swatches Generation
+    colors.forEach(function(c) {
+        const swatch = document.createElement('div');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = c.hex;
+        swatch.title = c.name;
+        swatch.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            applyStyleToSelection('<span style="color:' + c.hex + '">', '</span>', false);
+            colorDropdown.classList.remove('open');
+        });
+        colorDropdown.appendChild(swatch);
+    });
+    // Clear swatch
+    const clearTextSwatch = document.createElement('div');
+    clearTextSwatch.className = 'color-swatch clear-swatch';
+    clearTextSwatch.title = '清除文字顏色';
+    clearTextSwatch.textContent = '❌';
+    clearTextSwatch.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.classList.contains('editor-textarea')) {
+            const start = activeEl.selectionStart;
+            const end = activeEl.selectionEnd;
+            const text = activeEl.value;
+            const selectedText = text.substring(start, end);
+            const stripped = selectedText.replace(/<span style="color:[^>]+">([\s\S]*?)<\/span>/gi, '$1');
+            activeEl.focus();
+            activeEl.setRangeText(stripped, start, end, 'select');
+            const event = new Event('input', { bubbles: true });
+            activeEl.dispatchEvent(event);
+        }
+        colorDropdown.classList.remove('open');
+    });
+    colorDropdown.appendChild(clearTextSwatch);
+
+    highlights.forEach(function(h) {
+        const swatch = document.createElement('div');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = h.hex;
+        swatch.title = h.name;
+        swatch.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            applyStyleToSelection('<mark style="background-color:' + h.hex + '">', '</mark>', false);
+            highlightDropdown.classList.remove('open');
+        });
+        highlightDropdown.appendChild(swatch);
+    });
+    // Clear highlight swatch
+    const clearHighlightSwatch = document.createElement('div');
+    clearHighlightSwatch.className = 'color-swatch clear-swatch';
+    clearHighlightSwatch.title = '清除螢光筆';
+    clearHighlightSwatch.textContent = '❌';
+    clearHighlightSwatch.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.classList.contains('editor-textarea')) {
+            const start = activeEl.selectionStart;
+            const end = activeEl.selectionEnd;
+            const text = activeEl.value;
+            const selectedText = text.substring(start, end);
+            let stripped = selectedText.replace(/<mark style="background-color:[^>]+">([\s\S]*?)<\/mark>/gi, '$1');
+            stripped = stripped.replace(/<span style="background-color:[^>]+">([\s\S]*?)<\/span>/gi, '$1');
+            activeEl.focus();
+            activeEl.setRangeText(stripped, start, end, 'select');
+            const event = new Event('input', { bubbles: true });
+            activeEl.dispatchEvent(event);
+        }
+        highlightDropdown.classList.remove('open');
+    });
+    highlightDropdown.appendChild(clearHighlightSwatch);
+
+    // Dropdowns toggling
+    colorBtn.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        colorDropdown.classList.toggle('open');
+        highlightDropdown.classList.remove('open');
+    });
+
+    highlightBtn.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        highlightDropdown.classList.toggle('open');
+        colorDropdown.classList.remove('open');
+    });
+
+    styleBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        styleMenu.classList.toggle('open');
+    });
+
+    document.addEventListener('click', function(e) {
+        if (styleMenu && styleBtn && !styleMenu.contains(e.target) && !styleBtn.contains(e.target)) {
+            styleMenu.classList.remove('open');
+        }
+        if (colorDropdown && colorBtn && !colorDropdown.contains(e.target) && !colorBtn.contains(e.target)) {
+            colorDropdown.classList.remove('open');
+        }
+        if (highlightDropdown && highlightBtn && !highlightDropdown.contains(e.target) && !highlightBtn.contains(e.target)) {
+            highlightDropdown.classList.remove('open');
+        }
+    });
+
+    // Formatting bindings
+    document.getElementById('format-h1').addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        applyStyleToSelection('# ', '', true);
+    });
+    document.getElementById('format-h2').addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        applyStyleToSelection('## ', '', true);
+    });
+    document.getElementById('format-h3').addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        applyStyleToSelection('### ', '', true);
+    });
+    document.getElementById('format-bold').addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        applyStyleToSelection('**', '**', false);
+    });
+    document.getElementById('format-italic').addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        applyStyleToSelection('*', '*', false);
+    });
+    document.getElementById('format-underline').addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        applyStyleToSelection('<u>', '</u>', false);
+    });
+    document.getElementById('format-strike').addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        applyStyleToSelection('~~', '~~', false);
+    });
+
+    // Selection checking
+    document.addEventListener('selectionchange', function() {
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.classList.contains('editor-textarea')) {
+            const start = activeEl.selectionStart;
+            const end = activeEl.selectionEnd;
+            if (start !== end) {
+                formatToolbar.classList.add('visible');
+                detectSelectionFormat();
+                return;
+            }
+        }
+        const activeElInToolbar = activeEl && (activeEl.closest('#format-toolbar') || activeEl.closest('.picker-dropdown') || activeEl.closest('.dropdown-menu'));
+        if (!activeElInToolbar) {
+            formatToolbar.classList.remove('visible');
+        }
+    });
+
+    // Debounced VS Code document updates
+    let updateTimeout = null;
+    function debouncedUpdate(pageIndex, updates) {
+        if (updateTimeout) clearTimeout(updateTimeout);
+        updateTimeout = setTimeout(function() {
+            vscode.postMessage({
+                command: 'updateDocsPage',
+                pageIndex: pageIndex,
+                updates: updates
+            });
+        }, 300);
+    }
+
     // @state: green
     function escapeHtml(value) {
         return String(value || '')
@@ -195,14 +366,25 @@ export const DocsSchemaJS = String.raw`
             .replace(/'/g, '&#039;');
     }
 
-    // @state: green
+    // @state: red
     function parseInlineMarkdown(text) {
-        return escapeHtml(text)
+        let escaped = escapeHtml(text);
+        escaped = escaped
+            .replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/gi, '<u>$1</u>')
+            .replace(/&lt;del&gt;([\s\S]*?)&lt;\/del&gt;/gi, '<del>$1</del>')
+            .replace(/&lt;s&gt;([\s\S]*?)&lt;\/s&gt;/gi, '<s>$1</s>')
+            .replace(/&lt;span style=&quot;color:\s*(#[a-fA-F0-9]{3,8}|[a-zA-Z]+);?&quot;&gt;([\s\S]*?)&lt;\/span&gt;/gi, '<span style="color:$1">$2</span>')
+            .replace(/&lt;span style=&quot;background-color:\s*(#[a-fA-F0-9]{3,8}|[a-zA-Z]+);?&quot;&gt;([\s\S]*?)&lt;\/span&gt;/gi, '<span style="background-color:$1">$2</span>')
+            .replace(/&lt;mark style=&quot;background-color:\s*(#[a-fA-F0-9]{3,8}|[a-zA-Z]+);?&quot;&gt;([\s\S]*?)&lt;\/mark&gt;/gi, '<mark style="background-color:$1">$2</mark>')
+            .replace(/&lt;mark&gt;([\s\S]*?)&lt;\/mark&gt;/gi, '<mark>$1</mark>');
+
+        return escaped
             .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
             .replace(/__(.+?)__/g, '<strong>$1</strong>')
             .replace(/\*(.+?)\*/g, '<em>$1</em>')
             .replace(/_(.+?)_/g, '<em>$1</em>')
-            .replace(/\`(.+?)\`/g, '<code>$1</code>');
+            .replace(/\`(.+?)\`/g, '<code>$1</code>')
+            .replace(/~~(.+?)~~/g, '<del>$1</del>');
     }
 
     // @state: green
@@ -311,7 +493,7 @@ export const DocsSchemaJS = String.raw`
             });
     }
 
-    // @state: green
+    // @state: red
     function renderSidebar() {
         sidebarList.innerHTML = '';
         const entries = visiblePageIndexes();
@@ -358,6 +540,23 @@ export const DocsSchemaJS = String.raw`
             outlineIndicator.style.display = isReadonly ? 'none' : 'inline-block';
             item.appendChild(outlineIndicator);
 
+            const deleteIndicator = document.createElement('button');
+            deleteIndicator.type = 'button';
+            deleteIndicator.className = 'delete-page-btn';
+            deleteIndicator.title = '刪除此頁';
+            deleteIndicator.textContent = '❌';
+            deleteIndicator.style.display = isReadonly ? 'none' : 'inline-block';
+            deleteIndicator.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (confirm('確定要刪除此頁嗎？')) {
+                    vscode.postMessage({
+                        command: 'deleteDocsPage',
+                        pageIndex: idx
+                    });
+                }
+            });
+            item.appendChild(deleteIndicator);
+
             item.addEventListener('click', function() {
                 scrollToPage(idx);
             });
@@ -367,17 +566,22 @@ export const DocsSchemaJS = String.raw`
         addPageBtn.style.display = isReadonly ? 'none' : 'block';
     }
 
-    // @state: green
+    // @state: red
     function scrollToPage(index) {
+        if (index < 0 || index >= localPages.length) return;
         const sheet = document.getElementById('page-sheet-' + index);
         if (sheet) {
             activePageIndex = index;
+            isSnapping = true;
             sheet.scrollIntoView({ behavior: 'smooth', block: 'start' });
             renderSidebar();
+            setTimeout(function() {
+                isSnapping = false;
+            }, 600);
         }
     }
 
-    // @state: green
+    // @state: red
     function renderPages() {
         docsContainer.innerHTML = '';
 
@@ -387,117 +591,55 @@ export const DocsSchemaJS = String.raw`
             sheet.id = 'page-sheet-' + idx;
             sheet.setAttribute('data-index', String(idx));
 
-            if (editingIndex === idx) {
-                renderEditor(sheet, page, idx);
-            } else {
+            if (isReadonly) {
                 renderPreview(sheet, page, idx);
+            } else {
+                renderEditor(sheet, page, idx);
             }
 
             docsContainer.appendChild(sheet);
         });
     }
 
-    // @state: green
+    // @state: red
     function renderEditor(sheet, page, idx) {
         const titleInput = document.createElement('input');
         titleInput.type = 'text';
         titleInput.className = 'editor-title-input';
         titleInput.value = page.title || '';
-        titleInput.placeholder = 'Page title';
+        titleInput.placeholder = '頁面標題';
+        titleInput.addEventListener('input', function() {
+            page.title = titleInput.value;
+            const sidebarTitle = document.querySelector('.sidebar-item[data-index="' + idx + '"] .sidebar-item-title');
+            if (sidebarTitle) {
+                sidebarTitle.textContent = titleInput.value || 'Page ' + (idx + 1);
+            }
+            debouncedUpdate(idx, { title: titleInput.value });
+        });
         sheet.appendChild(titleInput);
 
         const textarea = document.createElement('textarea');
         textarea.className = 'editor-textarea';
         textarea.value = page.content || '';
-        textarea.placeholder = 'Write Markdown';
+        textarea.placeholder = '在此輸入 Markdown 內容...';
+        
+        textarea.addEventListener('input', function() {
+            page.content = textarea.value;
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+            debouncedUpdate(idx, { content: textarea.value });
+        });
         sheet.appendChild(textarea);
 
-        const actions = document.createElement('div');
-        actions.className = 'editor-actions';
-
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'editor-btn';
-        cancelBtn.type = 'button';
-        cancelBtn.textContent = 'Cancel';
-        cancelBtn.addEventListener('click', function() {
-            editingIndex = null;
-            renderPages();
-        });
-
-        const saveBtn = document.createElement('button');
-        saveBtn.className = 'editor-btn save';
-        saveBtn.type = 'button';
-        saveBtn.textContent = 'Save';
-        saveBtn.addEventListener('click', function() {
-            vscode.postMessage({
-                command: 'updateDocsPage',
-                pageIndex: idx,
-                updates: {
-                    title: titleInput.value || 'Page ' + (idx + 1),
-                    content: textarea.value
-                }
-            });
-            editingIndex = null;
-        });
-
-        actions.appendChild(cancelBtn);
-        actions.appendChild(saveBtn);
-        sheet.appendChild(actions);
+        // Auto grow initially
+        setTimeout(function() {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        }, 0);
     }
 
     // @state: red
     function renderPreview(sheet, page, idx) {
-        const hud = document.createElement('div');
-        hud.className = 'page-header-hud';
-
-        const outlineBtn = document.createElement('button');
-        outlineBtn.className = 'hud-icon-btn';
-        outlineBtn.type = 'button';
-        outlineBtn.textContent = page.isOutline ? 'Outline' : 'Add outline';
-        outlineBtn.title = page.isOutline ? 'Remove from outline' : 'Add to outline';
-        outlineBtn.addEventListener('click', function() {
-            vscode.postMessage({
-                command: 'updateDocsPage',
-                pageIndex: idx,
-                updates: { isOutline: !page.isOutline }
-            });
-        });
-        hud.appendChild(outlineBtn);
-
-        const editBtn = document.createElement('button');
-        editBtn.className = 'hud-icon-btn';
-        editBtn.type = 'button';
-        editBtn.textContent = 'Edit';
-        editBtn.title = 'Edit page';
-        editBtn.addEventListener('click', function() {
-            editingIndex = idx;
-            activePageIndex = idx;
-            renderSidebar();
-            renderPages();
-            scrollToPage(idx);
-        });
-        hud.appendChild(editBtn);
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'hud-icon-btn delete';
-        deleteBtn.type = 'button';
-        deleteBtn.textContent = 'Delete';
-        deleteBtn.title = 'Delete page';
-        deleteBtn.addEventListener('click', function() {
-            if (confirm('Delete this page?')) {
-                vscode.postMessage({
-                    command: 'deleteDocsPage',
-                    pageIndex: idx
-                });
-            }
-        });
-        hud.appendChild(deleteBtn);
-        
-        if (isReadonly) {
-            hud.style.display = 'none';
-        }
-        sheet.appendChild(hud);
-
         const body = document.createElement('div');
         body.className = 'markdown-body';
         body.innerHTML = parseMarkdown(page.content || '');
@@ -509,8 +651,104 @@ export const DocsSchemaJS = String.raw`
         sheet.appendChild(pageNum);
     }
 
+    // @state: red
+    function applyStyleToSelection(prefix, suffix, isBlock) {
+        const activeEl = document.activeElement;
+        if (!activeEl || !activeEl.classList.contains('editor-textarea')) return;
+        
+        const start = activeEl.selectionStart;
+        const end = activeEl.selectionEnd;
+        const text = activeEl.value;
+        const selectedText = text.substring(start, end);
+        
+        let replacement = '';
+        if (isBlock) {
+            const before = text.substring(0, start);
+            const lineStartIdx = before.lastIndexOf('\n') + 1;
+            const lineEndIdx = text.indexOf('\n', end);
+            const actualLineEnd = lineEndIdx === -1 ? text.length : lineEndIdx;
+            const lineText = text.substring(lineStartIdx, actualLineEnd);
+            
+            if (lineText.startsWith(prefix)) {
+                replacement = lineText.substring(prefix.length);
+            } else {
+                const cleanLineText = lineText.replace(/^#{1,3}\s+/, '');
+                replacement = prefix + cleanLineText;
+            }
+            
+            activeEl.focus();
+            activeEl.setRangeText(replacement, lineStartIdx, actualLineEnd, 'select');
+        } else {
+            if (selectedText.startsWith(prefix) && selectedText.endsWith(suffix)) {
+                replacement = selectedText.substring(prefix.length, selectedText.length - suffix.length);
+            } else {
+                replacement = prefix + selectedText + suffix;
+            }
+            activeEl.focus();
+            activeEl.setRangeText(replacement, start, end, 'select');
+        }
+        
+        const event = new Event('input', { bubbles: true });
+        activeEl.dispatchEvent(event);
+        
+        detectSelectionFormat();
+    }
+
+    // @state: red
+    function detectSelectionFormat() {
+        const activeEl = document.activeElement;
+        const buttons = {
+            bold: document.getElementById('format-bold'),
+            italic: document.getElementById('format-italic'),
+            underline: document.getElementById('format-underline'),
+            strike: document.getElementById('format-strike'),
+            h1: document.getElementById('format-h1'),
+            h2: document.getElementById('format-h2'),
+            h3: document.getElementById('format-h3')
+        };
+        
+        for (const key in buttons) {
+            if (buttons[key]) buttons[key].classList.remove('active');
+        }
+        
+        if (!activeEl || !activeEl.classList.contains('editor-textarea')) return;
+        
+        const start = activeEl.selectionStart;
+        const end = activeEl.selectionEnd;
+        const text = activeEl.value;
+        const selectedText = text.substring(start, end);
+        
+        if (selectedText.startsWith('**') && selectedText.endsWith('**')) {
+            if (buttons.bold) buttons.bold.classList.add('active');
+        }
+        if (selectedText.startsWith('*') && selectedText.endsWith('*')) {
+            if (buttons.italic) buttons.italic.classList.add('active');
+        }
+        if (selectedText.startsWith('<u>') && selectedText.endsWith('</u>')) {
+            if (buttons.underline) buttons.underline.classList.add('active');
+        }
+        if (selectedText.startsWith('~~') && selectedText.endsWith('~~')) {
+            if (buttons.strike) buttons.strike.classList.add('active');
+        }
+        
+        const before = text.substring(0, start);
+        const lineStartIdx = before.lastIndexOf('\n') + 1;
+        const lineEndIdx = text.indexOf('\n', start);
+        const actualLineEnd = lineEndIdx === -1 ? text.length : lineEndIdx;
+        const lineText = text.substring(lineStartIdx, actualLineEnd);
+        
+        if (lineText.startsWith('# ')) {
+            if (buttons.h1) buttons.h1.classList.add('active');
+        } else if (lineText.startsWith('## ')) {
+            if (buttons.h2) buttons.h2.classList.add('active');
+        } else if (lineText.startsWith('### ')) {
+            if (buttons.h3) buttons.h3.classList.add('active');
+        }
+    }
+
     // @state: green
     function syncActivePageFromScroll() {
+        if (isSnapping) return;
         const sheets = Array.from(document.querySelectorAll('.paper-page'));
         if (sheets.length === 0) {
             activePageIndex = 0;
@@ -538,6 +776,42 @@ export const DocsSchemaJS = String.raw`
     }
 
     scrollContainer.addEventListener('scroll', syncActivePageFromScroll);
+
+    // Mouse wheel page snapping
+    scrollContainer.addEventListener('wheel', function(e) {
+        if (isSnapping) {
+            e.preventDefault();
+            return;
+        }
+        const activePage = document.getElementById('page-sheet-' + activePageIndex);
+        if (!activePage) return;
+        
+        const pageTopInViewport = activePage.offsetTop;
+        const pageBottomInViewport = activePage.offsetTop + activePage.offsetHeight;
+        const viewportTop = scrollContainer.scrollTop;
+        const viewportBottom = viewportTop + scrollContainer.clientHeight;
+        
+        if (e.deltaY > 0) {
+            if (pageBottomInViewport > viewportBottom + 5) {
+                return;
+            } else {
+                if (activePageIndex < localPages.length - 1) {
+                    e.preventDefault();
+                    scrollToPage(activePageIndex + 1);
+                }
+            }
+        } else if (e.deltaY < 0) {
+            if (pageTopInViewport < viewportTop - 5) {
+                return;
+            } else {
+                if (activePageIndex > 0) {
+                    e.preventDefault();
+                    scrollToPage(activePageIndex - 1);
+                }
+            }
+        }
+    }, { passive: false });
+
     vscode.postMessage({ command: 'ready' });
 })();
 `;

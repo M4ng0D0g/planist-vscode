@@ -4,7 +4,7 @@
 
 | 檔案路徑 | 系統架構狀態 (最低階燈號) | 實質代碼行數 (上限 200) | 內部功能狀態分佈 |
 | :--- | :---: | :---: | :--- |
-| `src\commands\commandController.ts` | 🟢 Green | ⚠️ **275** | `綠: 11 | 黃: 0 | 紅: 0` |
+| `src\commands\commandController.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **384** | `綠: 10 | 黃: 2 | 紅: 1` |
 | `src\config\logger.ts` | 🟡 Yellow (未標記) | 40 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\config\patternManager.ts` | 🟡 Yellow (未標記) | 80 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\config\planistConfig.ts` | 🟡 Yellow (未標記) | ⚠️ **282** | `綠: 0 | 黃: 0 | 紅: 0` |
@@ -15,13 +15,13 @@
 | `src\core\model\PlanistViewModel.ts` | 🟢 Green | 54 | `綠: 10 | 黃: 0 | 紅: 0` |
 | `src\dsl\flowDsl.ts` | 🟢 Green | ⚠️ **1094** | `綠: 2 | 黃: 0 | 紅: 0` |
 | `src\dsl\taskDsl.ts` | 🟡 Yellow (未標記) | 78 | `綠: 0 | 黃: 0 | 紅: 0` |
-| `src\extension.ts` | 🟡 Yellow (未標記) | 148 | `綠: 0 | 黃: 0 | 紅: 0` |
+| `src\extension.ts` | 🟡 Yellow (未標記) | 152 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\indexing\flowIndexer.ts` | 🟡 Yellow (未標記) | ⚠️ **266** | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\indexing\workspaceManager.ts` | 🟡 Yellow (未標記) | 119 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\flowPreviewPanel.ts` | 🟡 Yellow (內部含未穩定函式) | 160 | `綠: 1 | 黃: 0 | 紅: 1` |
 | `src\preview\graphDataProvider.ts` | 🟢 Green | 113 | `綠: 1 | 黃: 0 | 紅: 0` |
-| `src\preview\newFlowPreviewPanel.ts` | 🟢 Green | ⚠️ **555** | `綠: 15 | 黃: 0 | 紅: 0` |
-| `src\preview\schemaParser.ts` | 🟢 Green | ⚠️ **353** | `綠: 1 | 黃: 0 | 紅: 0` |
+| `src\preview\newFlowPreviewPanel.ts` | 🟢 Green | ⚠️ **571** | `綠: 15 | 黃: 0 | 紅: 0` |
+| `src\preview\schemaParser.ts` | 🟢 Green | ⚠️ **391** | `綠: 1 | 黃: 0 | 紅: 0` |
 | `src\preview\sync\SyncHub.ts` | 🟡 Yellow (未標記) | 47 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\components\PlanistBadge.ts` | 🟡 Yellow (未標記) | 13 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\components\PlanistButton.ts` | 🟡 Yellow (未標記) | 19 | `綠: 0 | 黃: 0 | 紅: 0` |
@@ -32,9 +32,9 @@
 | `src\preview\ui\core\WebviewPage.ts` | 🟡 Yellow (未標記) | 44 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\schemas\ApiSchemaRenderer.ts` | 🟡 Yellow (未標記) | 155 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\schemas\DatabaseSchemaRenderer.ts` | 🟡 Yellow (未標記) | 170 | `綠: 0 | 黃: 0 | 紅: 0` |
-| `src\preview\ui\schemas\DesignSchemaRenderer.ts` | 🟡 Yellow (未標記) | 182 | `綠: 0 | 黃: 0 | 紅: 0` |
-| `src\preview\ui\schemas\DocsSchemaJS.ts` | 🟢 Green | ⚠️ **338** | `綠: 12 | 黃: 0 | 紅: 0` |
-| `src\preview\ui\schemas\DocsSchemaRenderer.ts` | 🟢 Green | ⚠️ **379** | `綠: 3 | 黃: 0 | 紅: 0` |
+| `src\preview\ui\schemas\DesignSchemaRenderer.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **870** | `綠: 0 | 黃: 2 | 紅: 0` |
+| `src\preview\ui\schemas\DocsSchemaJS.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **468** | `綠: 10 | 黃: 0 | 紅: 2` |
+| `src\preview\ui\schemas\DocsSchemaRenderer.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **560** | `綠: 0 | 黃: 0 | 紅: 3` |
 | `src\preview\ui\schemas\FlowSchemaJS.ts` | 🟡 Yellow (未標記) | ⚠️ **392** | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\schemas\FlowSchemaRenderer.ts` | 🟡 Yellow (內部含未穩定函式) | 58 | `綠: 0 | 黃: 0 | 紅: 1` |
 | `src\preview\ui\schemas\NewFlowSchemaJS.ts` | 🟢 Green | ⚠️ **1098** | `綠: 20 | 黃: 0 | 紅: 0` |
@@ -52,7 +52,7 @@
 | `src\providers\highlighter.ts` | 🟡 Yellow (未標記) | 147 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\providers\hoverProvider.ts` | 🟡 Yellow (未標記) | 65 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\providers\linterProvider.ts` | 🟡 Yellow (未標記) | ⚠️ **244** | `綠: 0 | 黃: 0 | 紅: 0` |
-| `src\providers\PlanistEditorProvider.ts` | 🟢 Green | ⚠️ **300** | `綠: 10 | 黃: 0 | 紅: 0` |
+| `src\providers\PlanistEditorProvider.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **313** | `綠: 8 | 黃: 0 | 紅: 2` |
 | `src\providers\semanticProvider.ts` | 🟡 Yellow (未標記) | 54 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\test\extension.test.ts` | 🟡 Yellow (未標記) | 9 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\test\flowDsl.test.ts` | 🟡 Yellow (未標記) | ⚠️ **317** | `綠: 0 | 黃: 0 | 紅: 0` |

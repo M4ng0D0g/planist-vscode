@@ -59,7 +59,7 @@ export const DocsSchemaCSS = `
     #app-container {
         display: flex;
         width: 100vw;
-        height: calc(100vh - 48px);
+        height: calc(100vh - 54px);
         overflow: hidden;
         transition: all 0.25s ease;
     }
@@ -143,8 +143,8 @@ export const DocsSchemaCSS = `
         font-size: 13px;
         margin-bottom: 4px;
         display: grid;
-        grid-template-columns: auto 1fr auto;
-        gap: 8px;
+        grid-template-columns: auto 1fr auto auto;
+        gap: 6px;
         align-items: center;
         color: var(--text-color);
         background: transparent;
@@ -172,18 +172,33 @@ export const DocsSchemaCSS = `
         white-space: nowrap;
     }
 
-    .outline-toggle {
+    .outline-toggle, .delete-page-btn {
         border: 0;
         border-radius: 4px;
         background: transparent;
         color: var(--muted-color);
         cursor: pointer;
-        width: 26px;
+        width: 24px;
         height: 24px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        transition: all 0.1s ease;
+    }
+
+    .outline-toggle:hover {
+        color: #ca8a04;
+        background: rgba(127, 127, 127, 0.1);
     }
 
     .outline-toggle.active {
         color: #ca8a04;
+    }
+
+    .delete-page-btn:hover {
+        color: var(--danger-color);
+        background: rgba(127, 127, 127, 0.1);
     }
 
     #sidebar-actions {
@@ -195,13 +210,18 @@ export const DocsSchemaCSS = `
         width: 100%;
         min-height: 36px;
         padding: 8px 10px;
-        background: var(--active-color);
-        color: #fff;
+        background: var(--vscode-button-background, var(--active-color));
+        color: var(--vscode-button-foreground, #ffffff);
         border: 0;
         border-radius: 6px;
         font-size: 13px;
         font-weight: 700;
         cursor: pointer;
+        transition: background 0.15s ease;
+    }
+
+    #add-page-btn:hover {
+        background: var(--vscode-button-hoverBackground, var(--active-color));
     }
 
     #content-viewport {
@@ -287,8 +307,8 @@ export const DocsSchemaCSS = `
     }
 
     .markdown-body {
-        font-size: 14px;
-        line-height: 1.65;
+        font-size: var(--paper-font-size);
+        line-height: var(--paper-line-height);
         word-wrap: break-word;
     }
 
@@ -298,6 +318,10 @@ export const DocsSchemaCSS = `
         border-bottom: 1px solid var(--paper-border);
         padding-bottom: 8px;
         margin: 0 0 18px;
+        color: #111827;
+    }
+
+    body.vscode-light .markdown-body h1 {
         color: #111827;
     }
 
@@ -339,55 +363,40 @@ export const DocsSchemaCSS = `
         font-size: 0.9em;
     }
 
+    /* Editor styles inside page */
     .editor-title-input {
         width: 100%;
-        border: 1px solid var(--paper-border);
-        outline: none;
-        padding: 8px 10px;
-        border-radius: 5px;
-        box-sizing: border-box;
-        font-size: 18px;
+        background: transparent;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        font-size: 25px;
         font-weight: 700;
-        margin-bottom: 14px;
+        color: var(--theme-paper-text);
+        margin-bottom: 18px;
+        padding-bottom: 8px;
+        outline: none;
+        font-family: var(--paper-font-family);
+        box-sizing: border-box;
+        transition: border-bottom-color 0.15s ease;
+    }
+
+    .editor-title-input:focus {
+        border-bottom-color: var(--active-color);
     }
 
     .editor-textarea {
         width: 100%;
-        min-height: 760px;
-        border: 1px solid var(--paper-border);
+        background: transparent;
+        border: 0;
+        color: var(--theme-paper-text);
+        font-family: var(--paper-font-family);
+        font-size: var(--paper-font-size);
+        line-height: var(--paper-line-height);
+        resize: none;
         outline: none;
-        padding: 12px;
-        border-radius: 5px;
+        overflow-y: hidden;
         box-sizing: border-box;
-        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-        font-size: 13px;
-        line-height: 1.55;
-        resize: vertical;
-    }
-
-    .editor-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-        margin-top: 14px;
-    }
-
-    .editor-btn {
-        min-height: 34px;
-        padding: 7px 14px;
-        border: 1px solid #d4d4d8;
-        background: #fff;
-        color: #27272a;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: 600;
-        font-size: 13px;
-    }
-
-    .editor-btn.save {
-        background: var(--active-color);
-        color: #fff;
-        border-color: var(--active-color);
+        min-height: 300px;
     }
 
     @media (max-width: 760px) {
@@ -406,7 +415,7 @@ export const DocsSchemaCSS = `
         display: flex;
         justify-content: space-between;
         align-items: center;
-        height: 48px;
+        height: 54px;
         background: var(--sidebar-bg);
         border-bottom: 1px solid var(--sidebar-border);
         padding: 0 16px;
@@ -421,33 +430,44 @@ export const DocsSchemaCSS = `
         gap: 8px;
     }
 
-    .toolbar-btn, .size-btn, .toolbar-select {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid var(--sidebar-border);
+    .toolbar-btn {
+        background: transparent;
+        border: 1px solid transparent;
         color: var(--text-color);
-        padding: 5px 10px;
+        width: 32px;
+        height: 32px;
         border-radius: 6px;
-        font-size: 12px;
         cursor: pointer;
         outline: none;
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        justify-content: center;
         transition: all 0.15s ease;
+        font-size: 14px;
     }
 
-    body.vscode-light .toolbar-btn, 
-    body.vscode-light .size-btn, 
-    body.vscode-light .toolbar-select {
-        background: #ffffff;
-        border-color: rgba(0, 0, 0, 0.12);
+    body.vscode-light .toolbar-btn {
         color: #1f2937;
     }
 
-    .toolbar-btn:hover, .size-btn:hover, .toolbar-select:hover {
-        background: var(--active-color);
-        color: #fff;
-        border-color: var(--active-color);
+    .toolbar-btn:hover {
+        background: rgba(127, 127, 127, 0.15);
+    }
+
+    .toolbar-btn.active {
+        background: var(--vscode-button-background, var(--active-color));
+        color: var(--vscode-button-foreground, #ffffff);
+    }
+
+    .toolbar-btn.active:hover {
+        background: var(--vscode-button-hoverBackground, var(--active-color));
+    }
+
+    .toolbar-separator {
+        width: 1px;
+        height: 18px;
+        background: var(--sidebar-border);
+        margin: 0 4px;
     }
 
     /* Mode Toggle Group */
@@ -467,57 +487,163 @@ export const DocsSchemaCSS = `
         background: transparent;
         border: 0;
         color: var(--muted-color);
-        padding: 4px 10px;
+        width: 30px;
+        height: 26px;
         border-radius: 4px;
-        font-size: 12px;
+        font-size: 13px;
         cursor: pointer;
-        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         transition: all 0.15s ease;
     }
 
     .mode-toggle-group button.active {
-        background: var(--active-color);
-        color: #fff;
+        background: var(--vscode-button-background, var(--active-color));
+        color: var(--vscode-button-foreground, #ffffff);
     }
 
-    /* Font Size group */
-    .font-size-group {
+    .mode-toggle-group button.active:hover {
+        background: var(--vscode-button-hoverBackground, var(--active-color));
+    }
+
+    /* Format Selection Toolbar */
+    #format-toolbar {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
         display: flex;
         align-items: center;
-        background: rgba(0, 0, 0, 0.15);
-        border-radius: 6px;
-        border: 1px solid var(--sidebar-border);
-        padding: 2px;
+        gap: 6px;
     }
 
-    body.vscode-light .font-size-group {
+    #format-toolbar.visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* Dropdown/Popover Menu */
+    .dropdown-menu {
+        position: absolute;
+        top: 40px;
+        right: 0;
+        background: var(--sidebar-bg);
+        border: 1px solid var(--sidebar-border);
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+        padding: 14px;
+        display: none;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 190px;
+        z-index: 300;
+    }
+
+    .dropdown-menu.open {
+        display: flex;
+    }
+
+    .dropdown-menu-item {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .dropdown-menu-label {
+        font-size: 11px;
+        color: var(--muted-color);
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+
+    .toolbar-menu-btn {
+        background: var(--vscode-button-background, var(--active-color));
+        color: var(--vscode-button-foreground, #ffffff);
+        border: 0;
+        padding: 7px 12px;
+        border-radius: 5px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s ease;
+        text-align: center;
+    }
+
+    .toolbar-menu-btn:hover {
+        background: var(--vscode-button-hoverBackground, var(--active-color));
+    }
+
+    .toolbar-select {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--sidebar-border);
+        color: var(--text-color);
+        padding: 6px 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        cursor: pointer;
+        outline: none;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    body.vscode-light .toolbar-select {
         background: #ffffff;
         border-color: rgba(0, 0, 0, 0.12);
-    }
-
-    .font-size-group .size-btn {
-        background: transparent;
-        border: 0;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-weight: bold;
-    }
-
-    #font-size-display {
-        font-size: 11px;
-        min-width: 32px;
-        text-align: center;
-        color: var(--text-color);
-    }
-
-    body.vscode-light #font-size-display {
         color: #1f2937;
+    }
+
+    /* Color Picker Styles */
+    .color-picker-wrapper {
+        position: relative;
+    }
+
+    .picker-dropdown {
+        position: absolute;
+        top: 38px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--sidebar-bg);
+        border: 1px solid var(--sidebar-border);
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        padding: 8px;
+        display: none;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        z-index: 310;
+    }
+
+    .picker-dropdown.open {
+        display: grid;
+    }
+
+    .color-swatch {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        cursor: pointer;
+        border: 1px solid rgba(127, 127, 127, 0.3);
+        transition: transform 0.1s ease;
+    }
+
+    .color-swatch:hover {
+        transform: scale(1.15);
+    }
+
+    .color-swatch.clear-swatch {
+        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: var(--muted-color);
+        border-style: dashed;
     }
 
     /* Raw Editor view */
     #raw-editor-container {
         width: 100vw;
-        height: calc(100vh - 48px);
+        height: calc(100vh - 54px);
         background: var(--workspace-bg);
         box-sizing: border-box;
         padding: 16px;
@@ -572,38 +698,68 @@ export class DocsSchemaRenderer implements ISchemaRenderer {
                 htmlParts.push('    <div id="toolbar-header">');
                 htmlParts.push('        <div class="toolbar-left">');
                 htmlParts.push('            <button id="toggle-sidebar-btn" class="toolbar-btn" type="button" title="收起側邊欄">');
-                htmlParts.push('                <span class="btn-icon">📁</span> <span class="btn-text">側邊欄</span>');
+                htmlParts.push('                <span>📂</span>');
                 htmlParts.push('            </button>');
                 htmlParts.push('            <div class="mode-toggle-group" role="tablist">');
-                htmlParts.push('                <button id="mode-render-btn" class="active" type="button" role="tab" aria-selected="true">渲染模式</button>');
-                htmlParts.push('                <button id="mode-source-btn" type="button" role="tab" aria-selected="false">原始檔模式</button>');
+                htmlParts.push('                <button id="mode-render-btn" class="active" type="button" role="tab" aria-selected="true" title="渲染模式">👁️</button>');
+                htmlParts.push('                <button id="mode-source-btn" type="button" role="tab" aria-selected="false" title="原始檔模式">📝</button>');
                 htmlParts.push('            </div>');
-                htmlParts.push('            <button id="readonly-btn" class="toolbar-btn" type="button" title="切換唯讀模式">');
-                htmlParts.push('                <span class="btn-icon">🔓</span> <span class="btn-text">編輯中</span>');
+                htmlParts.push('            <button id="readonly-btn" class="toolbar-btn" type="button" title="切換唯讀/編輯模式">');
+                htmlParts.push('                <span id="readonly-icon">🔓</span>');
                 htmlParts.push('            </button>');
                 htmlParts.push('        </div>');
-                htmlParts.push('        <div class="toolbar-middle">');
-                htmlParts.push('            <select id="font-family-select" class="toolbar-select" title="字型樣式">');
-                htmlParts.push('                <option value="sans-serif">預設無襯線體</option>');
-                htmlParts.push('                <option value="serif">經典襯線體</option>');
-                htmlParts.push('                <option value="monospace">等寬程式碼體</option>');
-                htmlParts.push('                <option value="system-ui">系統預設 UI</option>');
-                htmlParts.push('            </select>');
-                htmlParts.push('            <div class="font-size-group">');
-                htmlParts.push('                <button id="font-dec-btn" class="size-btn" type="button" title="縮小字型">-</button>');
-                htmlParts.push('                <span id="font-size-display">14px</span>');
-                htmlParts.push('                <button id="font-inc-btn" class="size-btn" type="button" title="放大字型">+</button>');
+
+                // 中間文字段落格式工具 (選取時顯示)
+                htmlParts.push('        <div id="format-toolbar">');
+                htmlParts.push('            <button id="format-h1" class="toolbar-btn" type="button" title="大標題 (H1)">H1</button>');
+                htmlParts.push('            <button id="format-h2" class="toolbar-btn" type="button" title="中標題 (H2)">H2</button>');
+                htmlParts.push('            <button id="format-h3" class="toolbar-btn" type="button" title="小標題 (H3)">H3</button>');
+                htmlParts.push('            <div class="toolbar-separator"></div>');
+                htmlParts.push('            <button id="format-bold" class="toolbar-btn" type="button" title="粗體"><b>B</b></button>');
+                htmlParts.push('            <button id="format-italic" class="toolbar-btn" type="button" title="斜體"><i>I</i></button>');
+                htmlParts.push('            <button id="format-underline" class="toolbar-btn" type="button" title="底線"><u>U</u></button>');
+                htmlParts.push('            <button id="format-strike" class="toolbar-btn" type="button" title="刪除線"><s>S</s></button>');
+                htmlParts.push('            <div class="toolbar-separator"></div>');
+                htmlParts.push('            <div class="color-picker-wrapper">');
+                htmlParts.push('                <button id="color-btn" class="toolbar-btn" type="button" title="文字顏色">');
+                htmlParts.push('                    <span style="border-bottom: 2px solid #ef4444; padding-bottom: 1px;">A</span>');
+                htmlParts.push('                </button>');
+                htmlParts.push('                <div id="color-dropdown" class="picker-dropdown"></div>');
                 htmlParts.push('            </div>');
-                htmlParts.push('            <select id="line-height-select" class="toolbar-select" title="行高設定">');
-                htmlParts.push('                <option value="1.4">1.4 (緊湊)</option>');
-                htmlParts.push('                <option value="1.55">1.55 (標準)</option>');
-                htmlParts.push('                <option value="1.65" selected>1.65 (舒適)</option>');
-                htmlParts.push('                <option value="1.8">1.8 (寬敞)</option>');
-                htmlParts.push('            </select>');
+                htmlParts.push('            <div class="color-picker-wrapper">');
+                htmlParts.push('                <button id="highlight-btn" class="toolbar-btn" type="button" title="螢光筆">');
+                htmlParts.push('                    <span>🖍️</span>');
+                htmlParts.push('                </button>');
+                htmlParts.push('                <div id="highlight-dropdown" class="picker-dropdown"></div>');
+                htmlParts.push('            </div>');
                 htmlParts.push('        </div>');
+
+                // 右側風格設定
                 htmlParts.push('        <div class="toolbar-right">');
-                htmlParts.push('            <button id="full-width-btn" class="toolbar-btn" type="button" title="切換寬度">A4 比例</button>');
-                htmlParts.push('            <button id="theme-override-btn" class="toolbar-btn" type="button" title="切換主題模式">主題：跟隨系統</button>');
+                htmlParts.push('            <div style="position: relative;">');
+                htmlParts.push('                <button id="style-btn" class="toolbar-btn" type="button" title="風格設定">');
+                htmlParts.push('                    <span>🎨</span>');
+                htmlParts.push('                </button>');
+                htmlParts.push('                <div id="style-menu" class="dropdown-menu">');
+                htmlParts.push('                    <div class="dropdown-menu-item">');
+                htmlParts.push('                        <span class="dropdown-menu-label">字型樣式</span>');
+                htmlParts.push('                        <select id="font-family-select" class="toolbar-select">');
+                htmlParts.push('                            <option value="sans-serif">預設無襯線體</option>');
+                htmlParts.push('                            <option value="serif">經典襯線體</option>');
+                htmlParts.push('                            <option value="monospace">等寬程式碼體</option>');
+                htmlParts.push('                            <option value="system-ui">系統預設 UI</option>');
+                htmlParts.push('                        </select>');
+                htmlParts.push('                    </div>');
+                htmlParts.push('                    <div class="dropdown-menu-item">');
+                htmlParts.push('                        <span class="dropdown-menu-label">版面寬度</span>');
+                htmlParts.push('                        <button id="full-width-btn" class="toolbar-menu-btn" type="button">A4 比例</button>');
+                htmlParts.push('                    </div>');
+                htmlParts.push('                    <div class="dropdown-menu-item">');
+                htmlParts.push('                        <span class="dropdown-menu-label">主題模式</span>');
+                htmlParts.push('                        <button id="theme-override-btn" class="toolbar-menu-btn" type="button">主題：跟隨系統</button>');
+                htmlParts.push('                    </div>');
+                htmlParts.push('                </div>');
+                htmlParts.push('            </div>');
                 htmlParts.push('        </div>');
                 htmlParts.push('    </div>');
 
