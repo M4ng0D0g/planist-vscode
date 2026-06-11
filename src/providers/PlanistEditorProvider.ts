@@ -5,7 +5,7 @@ import { prepareGraphData } from '../preview/graphDataProvider';
 import { parseSchemaDocument, parseDocsSchema, DocsSchemaData } from '../preview/schemaParser';
 import { FlowIndexer } from '../indexing/flowIndexer';
 
-// @state: red
+// @state: green
 export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
     public static readonly viewType = 'planist.flowEditor';
 
@@ -15,7 +15,7 @@ export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
         private readonly indexer: FlowIndexer
     ) {}
 
-    // @state: red
+    // @state: green
     public async resolveCustomTextEditor(
         document: vscode.TextDocument,
         webviewPanel: vscode.WebviewPanel,
@@ -43,7 +43,7 @@ export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
         let currentViewMode = 'general';
         let currentCallChainStart: { entityName: string; methodName: string } | undefined = undefined;
 
-        // @state: red
+        // @state: green
         const updateWebview = async () => {
             const schema = this.detectSchema(document);
             if (schema === 'flow') {
@@ -79,7 +79,7 @@ export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
         const nonce = this.getNonce();
         webviewPanel.webview.html = renderer.renderPage(webviewPanel.webview, nonce).render();
 
-        // @state: red
+        // @state: green
         webviewPanel.webview.onDidReceiveMessage(async (message) => {
             if (message.command === 'ready') {
                 await updateWebview();
@@ -292,7 +292,7 @@ export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
         return 'flow';
     }
 
-    // @state: red
+    // @state: green
     private async updateDocsPageInDocument(
         document: vscode.TextDocument,
         pageIndex: number,
@@ -319,7 +319,7 @@ export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
         await vscode.workspace.applyEdit(edit);
     }
 
-    // @state: red
+    // @state: green
     private serializeDocsData(data: DocsSchemaData): string {
         const blocks: string[] = [];
         blocks.push(`#schema docs ${data.docName}`);
