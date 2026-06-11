@@ -347,7 +347,7 @@ function parseDatabaseSchema(text: string): DatabaseSchemaData {
 	return { dbName, tables };
 }
 
-// @state: yellow
+// @state: green
 export function parseDocsSchema(text: string): DocsSchemaData {
 	let docName = 'Untitled Document';
 	const schemaMatch = text.match(/^\s*#schema\s+docs\s+([A-Za-z0-9_-]+)/i);

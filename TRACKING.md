@@ -21,7 +21,7 @@
 | `src\preview\flowPreviewPanel.ts` | 🟡 Yellow (內部含未穩定函式) | 160 | `綠: 1 | 黃: 0 | 紅: 1` |
 | `src\preview\graphDataProvider.ts` | 🟢 Green | 113 | `綠: 1 | 黃: 0 | 紅: 0` |
 | `src\preview\newFlowPreviewPanel.ts` | 🟢 Green | ⚠️ **555** | `綠: 15 | 黃: 0 | 紅: 0` |
-| `src\preview\schemaParser.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **353** | `綠: 0 | 黃: 1 | 紅: 0` |
+| `src\preview\schemaParser.ts` | 🟢 Green | ⚠️ **353** | `綠: 1 | 黃: 0 | 紅: 0` |
 | `src\preview\sync\SyncHub.ts` | 🟡 Yellow (未標記) | 47 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\components\PlanistBadge.ts` | 🟡 Yellow (未標記) | 13 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\components\PlanistButton.ts` | 🟡 Yellow (未標記) | 19 | `綠: 0 | 黃: 0 | 紅: 0` |
