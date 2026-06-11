@@ -9,7 +9,7 @@ import { DatabaseSchemaRenderer } from './DatabaseSchemaRenderer';
 import { DocsSchemaRenderer } from './DocsSchemaRenderer';
 
 export class RendererFactory {
-	// @state: red
+	// @state: green
 	public static getRenderer(schema: string): ISchemaRenderer {
 		switch (schema.toLowerCase()) {
 			case 'flow':
