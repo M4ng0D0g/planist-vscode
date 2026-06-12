@@ -1,4 +1,4 @@
-// @state: red
+// @state: green
 export const NewFlowSchemaSettingsJS = `
 (function() {
     console.log('====== Planist Visualizer Node Settings Panel Core Activated ======');

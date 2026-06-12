@@ -215,7 +215,7 @@ panel MainWindow {
 	}
 }
 
-// @state: red
+// @state: green
 async function promptPlanistFilePath(title: string, defaultFileName: string): Promise<vscode.Uri | undefined> {
 	const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
 	let rootUri: vscode.Uri | undefined;
@@ -280,7 +280,7 @@ async function promptPlanistFilePath(title: string, defaultFileName: string): Pr
 	return vscode.Uri.file(path.resolve(folderUri.fsPath, fileName));
 }
 
-// @state: yellow
+// @state: green
 async function promptDirectorySelection(title: string, rootUri: vscode.Uri): Promise<vscode.Uri | undefined> {
 	let currentDir = rootUri.fsPath;
 

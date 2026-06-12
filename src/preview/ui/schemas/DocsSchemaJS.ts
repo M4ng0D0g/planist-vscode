@@ -1,4 +1,4 @@
-// @state: red
+// @state: green
 export const DocsSchemaJS = String.raw`
 (function() {
     const vscode = acquireVsCodeApi();
@@ -366,7 +366,7 @@ export const DocsSchemaJS = String.raw`
             .replace(/'/g, '&#039;');
     }
 
-    // @state: red
+    // @state: green
     function parseInlineMarkdown(text) {
         let escaped = escapeHtml(text);
         escaped = escaped
@@ -493,7 +493,7 @@ export const DocsSchemaJS = String.raw`
             });
     }
 
-    // @state: red
+    // @state: green
     function renderSidebar() {
         sidebarList.innerHTML = '';
         const entries = visiblePageIndexes();
@@ -566,7 +566,7 @@ export const DocsSchemaJS = String.raw`
         addPageBtn.style.display = isReadonly ? 'none' : 'block';
     }
 
-    // @state: red
+    // @state: green
     function scrollToPage(index) {
         if (index < 0 || index >= localPages.length) return;
         const sheet = document.getElementById('page-sheet-' + index);
@@ -581,7 +581,7 @@ export const DocsSchemaJS = String.raw`
         }
     }
 
-    // @state: red
+    // @state: green
     function renderPages() {
         docsContainer.innerHTML = '';
 
@@ -601,7 +601,7 @@ export const DocsSchemaJS = String.raw`
         });
     }
 
-    // @state: red
+    // @state: green
     function renderEditor(sheet, page, idx) {
         const titleInput = document.createElement('input');
         titleInput.type = 'text';
@@ -638,7 +638,7 @@ export const DocsSchemaJS = String.raw`
         }, 0);
     }
 
-    // @state: red
+    // @state: green
     function renderPreview(sheet, page, idx) {
         const body = document.createElement('div');
         body.className = 'markdown-body';
@@ -651,7 +651,7 @@ export const DocsSchemaJS = String.raw`
         sheet.appendChild(pageNum);
     }
 
-    // @state: red
+    // @state: green
     function applyStyleToSelection(prefix, suffix, isBlock) {
         const activeEl = document.activeElement;
         if (!activeEl || !activeEl.classList.contains('editor-textarea')) return;
@@ -694,7 +694,7 @@ export const DocsSchemaJS = String.raw`
         detectSelectionFormat();
     }
 
-    // @state: red
+    // @state: green
     function detectSelectionFormat() {
         const activeEl = document.activeElement;
         const buttons = {

@@ -458,11 +458,11 @@ export const NewFlowSchemaCSS = `
     }
 `;
 
-// @state: red
+// @state: green
 export class NewFlowSchemaRenderer implements ISchemaRenderer {
-    // @state: red
+    // @state: green
     public renderPage(webview: vscode.Webview, nonce: string) {
-        // @state: red
+        // @state: green
         return {
             render: (): string => {
                 const htmlParts: string[] = [];

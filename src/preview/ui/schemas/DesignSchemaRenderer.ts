@@ -3,9 +3,9 @@ import { ISchemaRenderer } from './SchemaRenderer';
 import { WebviewPage } from '../core/WebviewPage';
 import { RawHtmlComponent } from '../core/Component';
 
-// @state: yellow
+// @state: green
 export class DesignSchemaRenderer implements ISchemaRenderer {
-	// @state: yellow
+	// @state: green
 	public renderPage(webview: vscode.Webview, nonce: string): WebviewPage {
 		const page = new WebviewPage('Planist UI Designer');
 

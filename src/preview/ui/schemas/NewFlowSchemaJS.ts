@@ -1,4 +1,4 @@
-// @state: red
+// @state: green
 export const NewFlowSchemaJS = `
 (function() {
     console.log('====== Planist New Infinite Board Core Activated ======');
@@ -63,7 +63,7 @@ export const NewFlowSchemaJS = `
         return '';
     }
 
-    // @state: red
+    // @state: green
     function init() {
         viewport = document.getElementById('viewport');
         workspace = document.getElementById('workspace');
@@ -371,7 +371,7 @@ export const NewFlowSchemaJS = `
         }
     }
 
-    // @state: red
+    // @state: green
     function handleMouseMove(e) {
         mouseX = (e.clientX - panX) / zoom;
         mouseY = (e.clientY - panY) / zoom;
@@ -431,7 +431,7 @@ export const NewFlowSchemaJS = `
         }
     }
 
-    // @state: red
+    // @state: green
     function handleMouseUp(e) {
         if (isDragging) {
             isDragging = false;
@@ -1116,7 +1116,7 @@ export const NewFlowSchemaJS = `
         }
     }
 
-    // @state: red
+    // @state: green
     function triggerResetConnectionLayoutForSelected() {
         if (selectedEntities.length === 0) return;
         

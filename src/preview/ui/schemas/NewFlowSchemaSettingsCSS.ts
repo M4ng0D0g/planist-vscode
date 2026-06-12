@@ -1,4 +1,4 @@
-// @state: red
+// @state: green
 export const NewFlowSchemaSettingsCSS = `
     /* Settings panel styling */
     .settings-panel {

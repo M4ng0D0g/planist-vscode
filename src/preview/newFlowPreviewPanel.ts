@@ -380,7 +380,7 @@ export async function togglePreviewMode(): Promise<void> {
     await refreshCurrentPreview();
 }
 
-// @state: red
+// @state: green
 async function updateEntityInDocument(document: vscode.TextDocument, originalName: string, updatedData: any): Promise<void> {
     const text = document.getText();
     const docs = parseFlowDocuments(text);
@@ -774,7 +774,7 @@ async function updateMultipleConnectionsInRenderJson(
     }
 }
 
-// @state: red
+// @state: green
 function buildFlowTemplate(entityName: string, type: string): string {
     if (type === 'bind') {
         return `bind ${entityName}\n`;
@@ -785,7 +785,7 @@ function buildFlowTemplate(entityName: string, type: string): string {
     return `${type} ${entityName} {\n}\n`;
 }
 
-// @state: yellow
+// @state: green
 async function deleteFromRenderJson(document: vscode.TextDocument, entityName: string): Promise<void> {
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
     if (!workspaceFolder) return;
@@ -806,7 +806,7 @@ async function deleteFromRenderJson(document: vscode.TextDocument, entityName: s
     }
 }
 
-// @state: yellow
+// @state: green
 function buildFlowTemplateFromEntity(entityName: string, entityData: any): string {
     const lines: string[] = [];
     const kind = entityData.kind || 'class';

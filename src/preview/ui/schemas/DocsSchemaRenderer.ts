@@ -672,12 +672,12 @@ export const DocsSchemaCSS = `
     }
 `;
 
-// @state: red
+// @state: green
 export class DocsSchemaRenderer implements ISchemaRenderer {
-    // @state: red
+    // @state: green
     public renderPage(webview: vscode.Webview, nonce: string) {
         return {
-            // @state: red
+            // @state: green
             render: (): string => {
                 const htmlParts: string[] = [];
 

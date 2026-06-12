@@ -5,7 +5,7 @@ import { prepareGraphData } from '../preview/graphDataProvider';
 import { parseSchemaDocument, parseDocsSchema, DocsSchemaData } from '../preview/schemaParser';
 import { FlowIndexer } from '../indexing/flowIndexer';
 
-// @state: red
+// @state: green
 export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
     public static readonly viewType = 'planist.flowEditor';
 
@@ -15,7 +15,7 @@ export class PlanistEditorProvider implements vscode.CustomTextEditorProvider {
         private readonly indexer: FlowIndexer
     ) {}
 
-    // @state: red
+    // @state: green
     public async resolveCustomTextEditor(
         document: vscode.TextDocument,
         webviewPanel: vscode.WebviewPanel,
