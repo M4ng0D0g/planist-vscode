@@ -56,12 +56,34 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 				overflow-y: auto;
 				backdrop-filter: blur(10px);
 			}
-			#right-sidebar { border-right: none; border-left: 1px solid var(--border-color); }
+			#right-sidebar { border-right: none; border-left: 1px solid var(--border-color); width: 320px; }
 
 			.section { margin-bottom: 25px; }
 			.section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.4); letter-spacing: 1.2px; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
 
-			.catalog-list { display: flex; flex-direction: column; gap: 8px; }
+			/* Sidebar Tabs */
+			.sidebar-tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 15px; }
+			.sidebar-tab { flex:1; text-align:center; padding:10px; font-size:12px; font-weight:600; cursor:pointer; color: rgba(255,255,255,0.5); border-bottom: 2px solid transparent; transition: all 0.2s; }
+			.sidebar-tab:hover { color: #fff; }
+			.sidebar-tab.active { color: var(--accent-color); border-bottom-color: var(--accent-color); }
+			.tab-content { display: flex; flex-direction: column; flex: 1; }
+
+			/* Catalog Vertical Tabs layout */
+			.catalog-container { display: flex; gap: 10px; height: 100%; min-height: 250px; }
+			.catalog-v-tabs { display: flex; flex-direction: column; gap: 4px; width: 65px; border-right: 1px solid var(--border-color); padding-right: 8px; }
+			.catalog-v-tab {
+				padding: 8px 4px;
+				font-size: 11px;
+				text-align: center;
+				cursor: pointer;
+				border-radius: 6px;
+				color: rgba(255,255,255,0.6);
+				transition: all 0.2s;
+			}
+			.catalog-v-tab:hover { background: rgba(255,255,255,0.05); color:#fff; }
+			.catalog-v-tab.active { background: rgba(59, 130, 246, 0.15); color: var(--accent-color); font-weight:600; }
+			.catalog-v-content { flex: 1; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 450px; }
+
 			.catalog-item {
 				background: rgba(255,255,255,0.03);
 				border: 1px solid rgba(255,255,255,0.06);
@@ -86,7 +108,6 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 				position: relative;
 				border-radius: 8px;
 				box-shadow: 0 10px 40px rgba(0,0,0,0.6);
-				overflow: hidden;
 			}
 
 			.bg-grid {
@@ -106,7 +127,7 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 				box-sizing: border-box;
 				min-height: 24px;
 				min-width: 24px;
-				position: relative;
+				cursor: grab;
 			}
 			.canvas-element:hover {
 				outline-color: rgba(59, 130, 246, 0.5);
@@ -138,7 +159,7 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 			#tree-container { display: flex; flex-direction: column; gap: 2px; }
 			.tree-item-wrapper { display: flex; flex-direction: column; }
 			.tree-node {
-				padding: 6px 10px;
+				padding: 4px 8px;
 				font-size: 12px;
 				cursor: pointer;
 				border-radius: 6px;
@@ -153,6 +174,15 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 			.tree-node:hover { background: rgba(255,255,255,0.06); }
 			.tree-node.selected { background: rgba(59, 130, 246, 0.15) !important; border-color: var(--accent-color); color:#fff; }
 			.tree-node-title { display: flex; align-items: center; gap: 6px; }
+			.tree-arrow {
+				font-size: 8px;
+				color: rgba(255, 255, 255, 0.4);
+				cursor: pointer;
+				padding: 2px 4px;
+				display: inline-block;
+				transition: transform 0.2s;
+			}
+			.tree-arrow:hover { color: #fff; }
 			.tree-node-delete { color: rgba(255,255,255,0.3); font-size: 11px; cursor: pointer; border: none; background: none; padding: 2px 6px; }
 			.tree-node-delete:hover { color: #f43f5e; }
 
@@ -188,48 +218,11 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 					</div>
 				</div>
 				<div id="main-content">
-					<!-- Left Sidebar -->
+					<!-- Left Sidebar: Element tree exclusively -->
 					<div id="left-sidebar" class="sidebar">
-						<div class="section">
-							<div class="section-title">基礎元件庫 (Catalog)</div>
-							<div class="catalog-list">
-								<div class="catalog-item" draggable="true" data-type="stackPanel">
-									<span>StackPanel (疊排)</span>
-									<span class="catalog-icon">☰</span>
-								</div>
-								<div class="catalog-item" draggable="true" data-type="grid">
-									<span>Grid (網格)</span>
-									<span class="catalog-icon">⚏</span>
-								</div>
-								<div class="catalog-item" draggable="true" data-type="container">
-									<span>Container (容器)</span>
-									<span class="catalog-icon">⛶</span>
-								</div>
-								<div class="catalog-item" draggable="true" data-type="textBlock">
-									<span>TextBlock (文字)</span>
-									<span class="catalog-icon">T</span>
-								</div>
-								<div class="catalog-item" draggable="true" data-type="button">
-									<span>Button (按鈕)</span>
-									<span class="catalog-icon">🔘</span>
-								</div>
-								<div class="catalog-item" draggable="true" data-type="image">
-									<span>Image (圖片)</span>
-									<span class="catalog-icon">🖼</span>
-								</div>
-								<div class="catalog-item" draggable="true" data-type="textField">
-									<span>TextField (輸入框)</span>
-									<span class="catalog-icon">✎</span>
-								</div>
-							</div>
-						</div>
-						<div class="section">
+						<div class="section" style="flex:1; display:flex; flex-direction:column;">
 							<div class="section-title">元件樹架構 (Tree View)</div>
-							<div id="tree-container"></div>
-						</div>
-						<div class="section">
-							<div class="section-title">模板庫 (Templates)</div>
-							<div id="templates-container" class="catalog-list"></div>
+							<div id="tree-container" style="flex:1; overflow-y:auto;"></div>
 						</div>
 					</div>
 					
@@ -238,15 +231,36 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 						<div id="canvas" class="bg-grid"></div>
 					</div>
 					
-					<!-- Right Sidebar -->
+					<!-- Right Sidebar: Properties & Catalog/Templates -->
 					<div id="right-sidebar" class="sidebar">
-						<div class="section-title">屬性面板 (Properties)</div>
-						<div id="properties-editor">
-							<div class="no-selection">請選擇元件以進行編輯</div>
+						<div class="sidebar-tabs">
+							<div class="sidebar-tab active" id="tab-properties-header">屬性</div>
+							<div class="sidebar-tab" id="tab-catalog-header">元件庫</div>
 						</div>
 						
-						<div id="template-action-section" style="display:none; margin-top:20px; border-top:1px solid var(--border-color); padding-top:15px;">
-							<button class="t-btn success" id="create-template-btn" style="width:100%;">建立為新模板</button>
+						<!-- Tab Panel: Properties -->
+						<div id="properties-tab-content" class="tab-content">
+							<div id="properties-editor">
+								<div class="no-selection">請選擇元件以進行編輯</div>
+							</div>
+							
+							<div id="template-action-section" style="display:none; margin-top:20px; border-top:1px solid var(--border-color); padding-top:15px;">
+								<button class="t-btn success" id="create-template-btn" style="width:100%;">建立為新模板</button>
+							</div>
+						</div>
+
+						<!-- Tab Panel: Catalog with vertical categories -->
+						<div id="catalog-tab-content" class="tab-content" style="display:none;">
+							<div class="catalog-container">
+								<div class="catalog-v-tabs">
+									<div class="catalog-v-tab active" data-tab="layout">版面</div>
+									<div class="catalog-v-tab" data-tab="controls">控制</div>
+									<div class="catalog-v-tab" data-tab="templates">模板</div>
+								</div>
+								<div class="catalog-v-content" id="catalog-v-items-list">
+									<!-- Rendered dynamically -->
+								</div>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -264,16 +278,27 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 			let selectedNodeName = null;
 			let currentDragType = null;
 			let currentDragIsTemplate = false;
+			let currentDragIsTreeMove = false;
+			
+			// Active catalog vertical sub-tab
+			let activeCatalogTab = 'layout';
+			// Active right sidebar tab ('properties' or 'catalog')
+			let activeRightSidebarTab = 'catalog';
 
 			// Elements
 			const canvas = document.getElementById('canvas');
 			const bgPatternBtn = document.getElementById('bg-pattern-btn');
 			const clearBtn = document.getElementById('clear-btn');
 			const treeContainer = document.getElementById('tree-container');
-			const templatesContainer = document.getElementById('templates-container');
 			const propertiesEditor = document.getElementById('properties-editor');
 			const templateActionSection = document.getElementById('template-action-section');
 			const createTemplateBtn = document.getElementById('create-template-btn');
+			
+			const tabPropertiesHeader = document.getElementById('tab-properties-header');
+			const tabCatalogHeader = document.getElementById('tab-catalog-header');
+			const propertiesTabContent = document.getElementById('properties-tab-content');
+			const catalogTabContent = document.getElementById('catalog-tab-content');
+			const catalogVItemsList = document.getElementById('catalog-v-items-list');
 
 			// Handle incoming VS Code messages
 			window.addEventListener('message', event => {
@@ -297,12 +322,32 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 				}
 			});
 
-			// Setup Catalog drag start
-			document.querySelectorAll('.catalog-item').forEach(item => {
-				item.addEventListener('dragstart', (e) => {
-					currentDragType = item.getAttribute('data-type');
-					currentDragIsTemplate = false;
-					e.dataTransfer.setData('text/plain', currentDragType);
+			// Setup right sidebar tabs
+			tabPropertiesHeader.addEventListener('click', () => switchRightTab('properties'));
+			tabCatalogHeader.addEventListener('click', () => switchRightTab('catalog'));
+
+			function switchRightTab(tab) {
+				activeRightSidebarTab = tab;
+				if (tab === 'properties') {
+					tabPropertiesHeader.classList.add('active');
+					tabCatalogHeader.classList.remove('active');
+					propertiesTabContent.style.display = 'flex';
+					catalogTabContent.style.display = 'none';
+				} else {
+					tabPropertiesHeader.classList.remove('active');
+					tabCatalogHeader.classList.add('active');
+					propertiesTabContent.style.display = 'none';
+					catalogTabContent.style.display = 'flex';
+				}
+			}
+
+			// Setup vertical categories tabs in catalog
+			document.querySelectorAll('.catalog-v-tab').forEach(tab => {
+				tab.addEventListener('click', () => {
+					document.querySelectorAll('.catalog-v-tab').forEach(t => t.classList.remove('active'));
+					tab.classList.add('active');
+					activeCatalogTab = tab.getAttribute('data-tab');
+					renderCatalogItemsList();
 				});
 			});
 
@@ -322,6 +367,7 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 			clearBtn.addEventListener('click', () => {
 				themeData.panels = [];
 				selectedNodeName = null;
+				switchRightTab('catalog');
 				reRender();
 				syncChanges();
 			});
@@ -349,7 +395,7 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 
 				reRender();
 				syncChanges();
-				alert('模板 "' + safeName + '" 建立成功！可在左側欄模板庫中拖放使用。');
+				alert('模板 "' + safeName + '" 建立成功！可在元件庫的「模板」分頁中拖放使用。');
 			});
 
 			// Render routine
@@ -370,11 +416,65 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 				// 4. Render Tree View
 				renderTreeView();
 
-				// 5. Render Templates List
-				renderTemplatesCatalog();
+				// 5. Render Catalog Items List
+				renderCatalogItemsList();
 
 				// 6. Update Properties Sidebar
 				renderProperties();
+			}
+
+			// Render Catalog sub-items
+			function renderCatalogItemsList() {
+				catalogVItemsList.innerHTML = '';
+
+				if (activeCatalogTab === 'layout') {
+					const layouts = [
+						{ type: 'stackPanel', label: 'StackPanel (疊排)', icon: '☰' },
+						{ type: 'grid', label: 'Grid (網格)', icon: '⚏' },
+						{ type: 'container', label: 'Container (容器)', icon: '⛶' }
+					];
+					layouts.forEach(item => {
+						catalogVItemsList.appendChild(buildCatalogDraggableItem(item.type, item.label, item.icon, false));
+					});
+				} else if (activeCatalogTab === 'controls') {
+					const controls = [
+						{ type: 'textBlock', label: 'TextBlock (文字)', icon: 'T' },
+						{ type: 'button', label: 'Button (按鈕)', icon: '🔘' },
+						{ type: 'image', label: 'Image (圖片)', icon: '🖼' },
+						{ type: 'textField', label: 'TextField (輸入框)', icon: '✎' }
+					];
+					controls.forEach(item => {
+						catalogVItemsList.appendChild(buildCatalogDraggableItem(item.type, item.label, item.icon, false));
+					});
+				} else if (activeCatalogTab === 'templates') {
+					const list = themeData.templates || [];
+					if (list.length === 0) {
+						const empty = document.createElement('div');
+						empty.className = 'no-selection';
+						empty.style.marginTop = '20px';
+						empty.textContent = '尚未建立自訂模板';
+						catalogVItemsList.appendChild(empty);
+						return;
+					}
+					list.forEach(t => {
+						catalogVItemsList.appendChild(buildCatalogDraggableItem(t.name, t.name, '★', true));
+					});
+				}
+			}
+
+			function buildCatalogDraggableItem(type, label, icon, isTemplate) {
+				const el = document.createElement('div');
+				el.className = 'catalog-item';
+				el.setAttribute('draggable', 'true');
+				el.innerHTML = '<span>' + label + '</span> <span class="catalog-icon">' + icon + '</span>';
+				
+				el.addEventListener('dragstart', (e) => {
+					currentDragType = type;
+					currentDragIsTemplate = isTemplate;
+					currentDragIsTreeMove = false;
+					e.dataTransfer.setData('text/plain', type);
+				});
+				return el;
 			}
 
 			// Recursive renderer for UIComponent -> HTMLElement
@@ -440,56 +540,121 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 					input.className = 'prop-input';
 					input.style.width = '100%';
 					input.placeholder = props.placeholder || 'Enter text...';
-					input.disabled = true; // Preview only
+					input.disabled = true;
 					el.appendChild(input);
 				}
 
 				// Grid placement child values
-				if (props['grid.row'] !== undefined) el.style.gridRow = props['grid.row'] + 1; // 1-indexed for CSS
+				if (props['grid.row'] !== undefined) el.style.gridRow = props['grid.row'] + 1;
 				if (props['grid.column'] !== undefined) el.style.gridColumn = props['grid.column'] + 1;
 
-				// Dragging top-level panels absolutely
-				if (comp.type === 'panel') {
-					el.style.cursor = 'move';
-					el.addEventListener('mousedown', (e) => {
-						if (e.target.closest('.canvas-element') !== el) return; // Only drag panel itself
-						e.stopPropagation();
-						selectedNodeName = comp.name;
-						reRender();
+				// Dragging element logic (with Ctrl alignment mode)
+				el.addEventListener('mousedown', (e) => {
+					if (e.button !== 0) return; // Only left click
+					e.stopPropagation();
+					selectedNodeName = comp.name;
+					switchRightTab('properties');
+					reRender();
 
-						const startX = e.clientX;
-						const startY = e.clientY;
-						const startLeft = props.left || 0;
-						const startTop = props.top || 0;
+					const startX = e.clientX;
+					const startY = e.clientY;
+					const startLeft = props.left || 0;
+					const startTop = props.top || 0;
+					let hasMoved = false;
+					let potentialParentName = null;
 
-						function doDrag(dragEvt) {
-							props.left = startLeft + dragEvt.clientX - startX;
-							props.top = startTop + dragEvt.clientY - startY;
-							el.style.left = props.left + 'px';
-							el.style.top = props.top + 'px';
+					function onMouseMove(moveEvt) {
+						const dx = moveEvt.clientX - startX;
+						const dy = moveEvt.clientY - startY;
+						if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+							hasMoved = true;
 						}
 
-						function stopDrag() {
-							document.documentElement.removeEventListener('mousemove', doDrag);
-							document.documentElement.removeEventListener('mouseup', stopDrag);
+						if (moveEvt.ctrlKey) {
+							// Ctrl alignment mode
+							el.style.opacity = '0.5';
+							el.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+
+							// Hide element temporarily to check element from point behind it
+							el.style.pointerEvents = 'none';
+							const hoverEl = document.elementFromPoint(moveEvt.clientX, moveEvt.clientY);
+							el.style.pointerEvents = 'auto';
+
+							const targetParent = hoverEl ? hoverEl.closest('.canvas-element') : null;
+							if (targetParent) {
+								const targetName = targetParent.getAttribute('data-name');
+								const targetType = targetParent.getAttribute('data-type');
+								const containerTypes = ['panel', 'stackPanel', 'grid', 'container'];
+								
+								if (containerTypes.includes(targetType) && targetName !== comp.name && !isDescendantOf(comp.name, targetName)) {
+									document.querySelectorAll('.canvas-element').forEach(item => item.classList.remove('drag-over-container'));
+									targetParent.classList.add('drag-over-container');
+									potentialParentName = targetName;
+								} else {
+									document.querySelectorAll('.canvas-element').forEach(item => item.classList.remove('drag-over-container'));
+									potentialParentName = null;
+								}
+							} else {
+								document.querySelectorAll('.canvas-element').forEach(item => item.classList.remove('drag-over-container'));
+								potentialParentName = null;
+							}
+						} else {
+							// Normal dragging
+							el.style.opacity = '1.0';
+							el.style.transform = 'none';
+							document.querySelectorAll('.canvas-element').forEach(item => item.classList.remove('drag-over-container'));
+							potentialParentName = null;
+
+							if (comp.type === 'panel' || el.style.position === 'absolute') {
+								props.left = startLeft + dx;
+								props.top = startTop + dy;
+								el.style.left = props.left + 'px';
+								el.style.top = props.top + 'px';
+							}
+						}
+					}
+
+					function onMouseUp(upEvt) {
+						window.removeEventListener('mousemove', onMouseMove);
+						window.removeEventListener('mouseup', onMouseUp);
+
+						el.style.opacity = '1.0';
+						el.style.transform = 'none';
+						document.querySelectorAll('.canvas-element').forEach(item => item.classList.remove('drag-over-container'));
+
+						if (hasMoved) {
+							if (potentialParentName) {
+								const sourceNode = findNodeByName(themeData.panels, comp.name);
+								if (sourceNode) {
+									removeNodeByName(themeData.panels, comp.name);
+									const parentNode = findNodeByName(themeData.panels, potentialParentName);
+									if (parentNode) {
+										if (!parentNode.children) parentNode.children = [];
+										// Clear coordinates when dropping into container
+										delete sourceNode.properties.left;
+										delete sourceNode.properties.top;
+										parentNode.children.push(sourceNode);
+									}
+								}
+							}
+							reRender();
 							syncChanges();
 						}
+					}
 
-						document.documentElement.addEventListener('mousemove', doDrag);
-						document.documentElement.addEventListener('mouseup', stopDrag);
-					});
-				} else {
-					el.addEventListener('click', (e) => {
-						e.stopPropagation();
-						selectedNodeName = comp.name;
-						reRender();
-					});
-				}
+					window.addEventListener('mousemove', onMouseMove);
+					window.addEventListener('mouseup', onMouseUp);
+				});
 
-				// Setup Drag & Drop nesting target
+				// Drag over container drop logic
 				const containerTypes = ['panel', 'stackPanel', 'grid', 'container'];
 				if (containerTypes.includes(comp.type)) {
 					el.addEventListener('dragover', (e) => {
+						if (currentDragIsTreeMove) {
+							if (currentDragType === comp.name || isDescendantOf(currentDragType, comp.name)) {
+								return; // block dropping parent inside descendant
+							}
+						}
 						e.preventDefault();
 						e.stopPropagation();
 						el.classList.add('drag-over-container');
@@ -503,37 +668,55 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 						e.stopPropagation();
 						el.classList.remove('drag-over-container');
 
-						let newChild = null;
+						if (currentDragIsTreeMove) {
+							const sourceName = currentDragType;
+							const targetName = comp.name;
 
-						if (currentDragIsTemplate) {
-							const template = themeData.templates.find(t => t.name === currentDragType);
-							if (template) {
-								newChild = JSON.parse(JSON.stringify(template.rootComponent));
-								// Rename recursively to prevent naming collision
-								renameSubtree(newChild);
+							if (sourceName !== targetName && !isDescendantOf(sourceName, targetName)) {
+								const sourceNode = findNodeByName(themeData.panels, sourceName);
+								if (sourceNode) {
+									removeNodeByName(themeData.panels, sourceName);
+									if (!comp.children) comp.children = [];
+									delete sourceNode.properties.left;
+									delete sourceNode.properties.top;
+									comp.children.push(sourceNode);
+									selectedNodeName = sourceNode.name;
+									reRender();
+									syncChanges();
+								}
 							}
 						} else {
-							const nameCount = countNodesByType(themeData.panels, currentDragType) + 1;
-							newChild = {
-								type: currentDragType,
-								name: currentDragType + nameCount,
-								properties: getDefaultProps(currentDragType),
-								children: []
-							};
-						}
+							// dropped catalog item
+							let newChild = null;
+							if (currentDragIsTemplate) {
+								const template = themeData.templates.find(t => t.name === currentDragType);
+								if (template) {
+									newChild = JSON.parse(JSON.stringify(template.rootComponent));
+									renameSubtree(newChild);
+								}
+							} else {
+								const nameCount = countNodesByType(themeData.panels, currentDragType) + 1;
+								newChild = {
+									type: currentDragType,
+									name: currentDragType + nameCount,
+									properties: getDefaultProps(currentDragType),
+									children: []
+								};
+							}
 
-						if (newChild) {
-							if (!comp.children) comp.children = [];
-							comp.children.push(newChild);
-							selectedNodeName = newChild.name;
-							reRender();
-							syncChanges();
+							if (newChild) {
+								if (!comp.children) comp.children = [];
+								comp.children.push(newChild);
+								selectedNodeName = newChild.name;
+								reRender();
+								syncChanges();
+							}
 						}
 					});
 				}
 
-				// Render children
-				if (comp.children && comp.children.length > 0 && comp.type !== 'button' && comp.type !== 'image' && comp.type !== 'textField') {
+				// Render children recursively (if not collapsed)
+				if (!props.collapsed && comp.children && comp.children.length > 0 && comp.type !== 'button' && comp.type !== 'image' && comp.type !== 'textField') {
 					comp.children.forEach(child => {
 						el.appendChild(renderComponentNode(child));
 					});
@@ -542,64 +725,85 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 				return el;
 			}
 
-			// Drag-over setup for the main canvas (to allow dropping top-level panels)
+			// Canvas root dropping
 			canvas.addEventListener('dragover', (e) => {
 				e.preventDefault();
 			});
 			canvas.addEventListener('drop', (e) => {
 				e.preventDefault();
-				if (e.target !== canvas) return; // handled by child dropping
+				if (e.target !== canvas) return;
 
 				const rect = canvas.getBoundingClientRect();
 				const x = e.clientX - rect.left;
 				const y = e.clientY - rect.top;
 
-				let newComp = null;
-
-				if (currentDragIsTemplate) {
-					const template = themeData.templates.find(t => t.name === currentDragType);
-					if (template) {
-						newComp = JSON.parse(JSON.stringify(template.rootComponent));
-						renameSubtree(newComp);
-						// Force position left/top if it's placed on canvas root
-						newComp.properties.left = x;
-						newComp.properties.top = y;
+				if (currentDragIsTreeMove) {
+					// Dragged tree node onto canvas empty space -> make it a top level panel
+					const sourceNode = findNodeByName(themeData.panels, currentDragType);
+					if (sourceNode) {
+						removeNodeByName(themeData.panels, currentDragType);
+						sourceNode.type = 'panel'; // enforce panel on root
+						sourceNode.properties.left = x;
+						sourceNode.properties.top = y;
+						themeData.panels.push(sourceNode);
+						selectedNodeName = sourceNode.name;
+						reRender();
+						syncChanges();
 					}
 				} else {
-					// We only drop panels directly onto canvas root
-					const type = currentDragType === 'panel' ? 'panel' : 'panel';
-					const nameCount = countNodesByType(themeData.panels, type) + 1;
-					newComp = {
-						type: type,
-						name: type + nameCount,
-						properties: {
-							width: 300,
-							height: 200,
-							left: x,
-							top: y,
-							backgroundColor: '#1f2937',
-							borderRadius: 8,
-							padding: 12
-						},
-						children: []
-					};
-					// If dropped non-panel component directly, wrap it in a panel or add it inside a new panel
-					if (currentDragType !== 'panel') {
-						const childCount = countNodesByType(themeData.panels, currentDragType) + 1;
-						newComp.children.push({
-							type: currentDragType,
-							name: currentDragType + childCount,
-							properties: getDefaultProps(currentDragType),
+					// Catalog item dropped on canvas root -> wrap in panel
+					let newComp = null;
+					if (currentDragIsTemplate) {
+						const template = themeData.templates.find(t => t.name === currentDragType);
+						if (template) {
+							newComp = JSON.parse(JSON.stringify(template.rootComponent));
+							renameSubtree(newComp);
+							newComp.properties.left = x;
+							newComp.properties.top = y;
+						}
+					} else {
+						const type = currentDragType === 'panel' ? 'panel' : 'panel';
+						const nameCount = countNodesByType(themeData.panels, type) + 1;
+						newComp = {
+							type: type,
+							name: type + nameCount,
+							properties: {
+								width: 300,
+								height: 200,
+								left: x,
+								top: y,
+								backgroundColor: '#1f2937',
+								borderRadius: 8,
+								padding: 12
+							},
 							children: []
-						});
+						};
+						if (currentDragType !== 'panel') {
+							const childCount = countNodesByType(themeData.panels, currentDragType) + 1;
+							newComp.children.push({
+								type: currentDragType,
+								name: currentDragType + childCount,
+								properties: getDefaultProps(currentDragType),
+								children: []
+							});
+						}
+					}
+
+					if (newComp) {
+						themeData.panels.push(newComp);
+						selectedNodeName = newComp.name;
+						reRender();
+						syncChanges();
 					}
 				}
+			});
 
-				if (newComp) {
-					themeData.panels.push(newComp);
-					selectedNodeName = newComp.name;
+			// Canvas deselection click listener
+			canvas.addEventListener('mousedown', (e) => {
+				if (e.target === canvas) {
+					selectedNodeName = null;
+					switchRightTab('catalog');
 					reRender();
-					syncChanges();
 				}
 			});
 
@@ -670,14 +874,22 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 				return false;
 			}
 
-			// Render Tree view recursively
+			// Helper: Check descendant relationship
+			function isDescendantOf(parentName, childName) {
+				const parentNode = findNodeByName(themeData.panels, parentName);
+				if (!parentNode) return false;
+				if (!parentNode.children || parentNode.children.length === 0) return false;
+				return !!findNodeByName(parentNode.children, childName);
+			}
+
+			// Render Tree view recursively with expand/collapse and drag-reordering
 			function renderTreeView() {
 				treeContainer.innerHTML = '';
 				if (themeData.panels.length === 0) {
 					const empty = document.createElement('div');
 					empty.className = 'no-selection';
-					empty.style.marginTop = '10px';
-					empty.textContent = '拖曳元件至畫布以開始';
+					empty.style.marginTop = '20px';
+					empty.textContent = '元件庫中拖放元件至畫布以開始';
 					treeContainer.appendChild(empty);
 					return;
 				}
@@ -689,12 +901,34 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 					const row = document.createElement('div');
 					row.className = 'tree-node';
 					if (selectedNodeName === node.name) row.classList.add('selected');
-					row.style.paddingLeft = (indent * 12 + 8) + 'px';
+					row.style.paddingLeft = (indent * 12 + 6) + 'px';
+					row.style.border = '1px solid transparent';
 					
 					const titleGroup = document.createElement('div');
 					titleGroup.className = 'tree-node-title';
-					const icon = node.type === 'panel' ? '⛶' : (node.type === 'stackPanel' ? '☰' : (node.type === 'grid' ? '⚏' : '📄'));
-					titleGroup.innerHTML = '<span style="opacity:0.5; font-size:10px;">' + icon + '</span> <span>' + node.name + '</span>';
+
+					// Expand/collapse arrow
+					const hasChildren = node.children && node.children.length > 0;
+					if (hasChildren) {
+						const arrow = document.createElement('span');
+						arrow.className = 'tree-arrow';
+						arrow.textContent = node.properties.collapsed ? '▶' : '▼';
+						arrow.addEventListener('click', (e) => {
+							e.stopPropagation();
+							node.properties.collapsed = !node.properties.collapsed;
+							reRender();
+						});
+						titleGroup.appendChild(arrow);
+					} else {
+						const spacer = document.createElement('span');
+						spacer.style.width = '14px';
+						spacer.style.display = 'inline-block';
+						titleGroup.appendChild(spacer);
+					}
+
+					const nameSpan = document.createElement('span');
+					nameSpan.textContent = node.name;
+					titleGroup.appendChild(nameSpan);
 					row.appendChild(titleGroup);
 
 					const delBtn = document.createElement('button');
@@ -709,15 +943,62 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 					});
 					row.appendChild(delBtn);
 
+					// Tree view dragging re-ordering setup
+					row.setAttribute('draggable', 'true');
+					row.addEventListener('dragstart', (e) => {
+						e.stopPropagation();
+						currentDragType = node.name;
+						currentDragIsTreeMove = true;
+						e.dataTransfer.setData('text/plain', node.name);
+					});
+					row.addEventListener('dragover', (e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						const containerTypes = ['panel', 'stackPanel', 'grid', 'container'];
+						if (containerTypes.includes(node.type) && currentDragType !== node.name && !isDescendantOf(currentDragType, node.name)) {
+							row.style.borderColor = 'var(--accent-color)';
+						}
+					});
+					row.addEventListener('dragleave', (e) => {
+						row.style.borderColor = 'transparent';
+					});
+					row.addEventListener('drop', (e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						row.style.borderColor = 'transparent';
+
+						if (currentDragIsTreeMove) {
+							const sourceName = currentDragType;
+							const targetName = node.name;
+							
+							const containerTypes = ['panel', 'stackPanel', 'grid', 'container'];
+							if (containerTypes.includes(node.type) && sourceName !== targetName && !isDescendantOf(sourceName, targetName)) {
+								const sourceNode = findNodeByName(themeData.panels, sourceName);
+								if (sourceNode) {
+									removeNodeByName(themeData.panels, sourceName);
+									if (!node.children) node.children = [];
+									delete sourceNode.properties.left;
+									delete sourceNode.properties.top;
+									node.children.push(sourceNode);
+									selectedNodeName = sourceNode.name;
+									reRender();
+									syncChanges();
+								}
+							}
+						}
+					});
+
 					row.addEventListener('click', (e) => {
 						e.stopPropagation();
 						selectedNodeName = node.name;
+						switchRightTab('properties');
 						reRender();
 					});
 
 					wrapper.appendChild(row);
 
-					if (node.children && node.children.length > 0) {
+					// Render children if not collapsed
+					if (!node.properties.collapsed && node.children && node.children.length > 0) {
 						node.children.forEach(child => {
 							wrapper.appendChild(buildTreeNodeEl(child, indent + 1));
 						});
@@ -728,35 +1009,6 @@ export class DesignSchemaRenderer implements ISchemaRenderer {
 
 				themeData.panels.forEach(panel => {
 					treeContainer.appendChild(buildTreeNodeEl(panel, 0));
-				});
-			}
-
-			// Render Templates list Catalog
-			function renderTemplatesCatalog() {
-				templatesContainer.innerHTML = '';
-				const list = themeData.templates || [];
-				if (list.length === 0) {
-					const empty = document.createElement('div');
-					empty.className = 'no-selection';
-					empty.style.marginTop = '10px';
-					empty.textContent = '尚未建立自訂模板';
-					templatesContainer.appendChild(empty);
-					return;
-				}
-
-				list.forEach(t => {
-					const el = document.createElement('div');
-					el.className = 'catalog-item';
-					el.setAttribute('draggable', 'true');
-					el.innerHTML = '<span>' + t.name + '</span> <span class="catalog-icon">★</span>';
-					
-					el.addEventListener('dragstart', (e) => {
-						currentDragType = t.name;
-						currentDragIsTemplate = true;
-						e.dataTransfer.setData('text/plain', t.name);
-					});
-
-					templatesContainer.appendChild(el);
 				});
 			}
 

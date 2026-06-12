@@ -179,6 +179,17 @@ export const NewFlowSchemaCSS = `
         transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
         cursor: grab;
         pointer-events: auto;
+        outline: none;
+    }
+
+    .board-node:focus {
+        outline: none;
+    }
+
+    .board-node.selected {
+        border-color: var(--vscode-button-background, var(--accent-color, #3b82f6)) !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45) !important;
+        outline: none !important;
     }
 
     .board-node:hover {
@@ -189,6 +200,16 @@ export const NewFlowSchemaCSS = `
 
     .board-node:active {
         cursor: grabbing;
+    }
+
+    /* Selection Box for dragging range */
+    .selection-box {
+        position: absolute;
+        border: 1.5px dashed var(--vscode-button-background, var(--accent-color, #3b82f6));
+        background: rgba(59, 130, 246, 0.1);
+        pointer-events: none;
+        z-index: 1000;
+        display: none;
     }
 
     .node-header {
@@ -437,11 +458,11 @@ export const NewFlowSchemaCSS = `
     }
 `;
 
-// @state: green
+// @state: red
 export class NewFlowSchemaRenderer implements ISchemaRenderer {
-    // @state: green
+    // @state: red
     public renderPage(webview: vscode.Webview, nonce: string) {
-        // @state: green
+        // @state: red
         return {
             render: (): string => {
                 const htmlParts: string[] = [];
@@ -449,7 +470,7 @@ export class NewFlowSchemaRenderer implements ISchemaRenderer {
                 htmlParts.push('<!DOCTYPE html>');
                 htmlParts.push('<html lang="zh-TW">');
                 htmlParts.push('<head>');
-                htmlParts.push('    <meta charset="UTF-8">');
+                htmlParts.push(`    <meta charset="UTF-8">`);
                 htmlParts.push(`    <meta http-equiv="Content-Security-Policy" content="default-src 'self' ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' 'unsafe-eval' ${webview.cspSource}; font-src ${webview.cspSource} https:;">`);
                 htmlParts.push('    <meta name="viewport" content="width=device-width, initial-scale=1.0">');
                 htmlParts.push('    <title>Planist Infinite Board</title>');
@@ -471,6 +492,7 @@ export class NewFlowSchemaRenderer implements ISchemaRenderer {
                 htmlParts.push('        <div id="workspace">');
                 // Nodes and connections will be rendered dynamically here
                 htmlParts.push('        </div>');
+                htmlParts.push('        <div id="selection-box" class="selection-box"></div>');
                 htmlParts.push('    </div>');
                 
                 // Floating Tooltip container
@@ -488,7 +510,7 @@ export class NewFlowSchemaRenderer implements ISchemaRenderer {
                 htmlParts.push('        <button class="hud-btn" id="zoom-in-btn" title="Zoom In">+</button>');
                 htmlParts.push('        <button class="hud-btn" id="zoom-reset-btn" title="Reset View">⟲</button>');
                 htmlParts.push('    </div>');
-
+ 
                 // Right Slide-out Settings Panel HTML
                 htmlParts.push('    <div id="settings-panel" class="settings-panel">');
                 htmlParts.push('        <div class="settings-header">');
@@ -497,10 +519,14 @@ export class NewFlowSchemaRenderer implements ISchemaRenderer {
                 htmlParts.push('        </div>');
                 htmlParts.push('        <div class="settings-tabs">');
                 htmlParts.push('            <div class="settings-tab active" id="tab-definition">屬性</div>');
+                htmlParts.push('            <div class="settings-tab" id="tab-relations">關聯</div>');
                 htmlParts.push('            <div class="settings-tab" id="tab-rendering">渲染</div>');
                 htmlParts.push('        </div>');
                 htmlParts.push('        <div class="settings-content" id="settings-content-definition" style="display: flex;">');
                 htmlParts.push('            <!-- Definition inputs generated dynamically -->');
+                htmlParts.push('        </div>');
+                htmlParts.push('        <div class="settings-content" id="settings-content-relations" style="display: none;">');
+                htmlParts.push('            <!-- Relations settings generated dynamically -->');
                 htmlParts.push('        </div>');
                 htmlParts.push('        <div class="settings-content" id="settings-content-rendering" style="display: none;">');
                 htmlParts.push('            <div class="form-group">');

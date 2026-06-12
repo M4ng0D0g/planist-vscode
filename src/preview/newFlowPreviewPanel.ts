@@ -237,6 +237,59 @@ export function getOrCreatePreviewPanel(context: vscode.ExtensionContext, indexe
                 await vscode.workspace.applyEdit(edit);
             }
         }
+        if (message?.command === 'deleteEntity' && typeof message.entityName === 'string') {
+            const editor = vscode.window.activeTextEditor;
+            if (editor && editor.document) {
+                if (getDocumentTrafficState(editor.document) === 'green') {
+                    vscode.window.showWarningMessage('🚨 [Planist 衛兵] 該模組目前處於綠燈 (Stable) 狀態，禁止 any 非物理性修改！');
+                    return;
+                }
+                const document = editor.document;
+                const text = document.getText();
+                const docs = parseFlowDocuments(text);
+                const docModel = docs.find(d => d.entityName === message.entityName);
+                if (docModel && docModel.startLine !== undefined && docModel.endLine !== undefined) {
+                    const edit = new vscode.WorkspaceEdit();
+                    let startLine = docModel.startLine;
+                    let endLine = docModel.endLine;
+                    if (startLine > 0 && document.lineAt(startLine - 1).text.trim() === '') {
+                        startLine--;
+                    }
+                    const range = new vscode.Range(
+                        new vscode.Position(startLine, 0),
+                        new vscode.Position(endLine, document.lineAt(endLine).text.length)
+                    );
+                    edit.delete(document.uri, range);
+                    await deleteFromRenderJson(document, message.entityName);
+                    await vscode.workspace.applyEdit(edit);
+                    await document.save();
+                }
+            }
+        }
+        if (message?.command === 'pasteEntity' && typeof message.entityName === 'string' && message.entityData) {
+            const editor = vscode.window.activeTextEditor;
+            if (editor && editor.document) {
+                if (getDocumentTrafficState(editor.document) === 'green') {
+                    vscode.window.showWarningMessage('🚨 [Planist 衛兵] 該模組目前處於綠燈 (Stable) 狀態，禁止 any 非物理性修改！');
+                    return;
+                }
+                const document = editor.document;
+                const currentText = document.getText();
+                const separator = currentText.endsWith('\n') ? (currentText.endsWith('\n\n') ? '' : '\n') : '\n\n';
+                const newEntityText = separator + buildFlowTemplateFromEntity(message.entityName, message.entityData);
+                
+                await updateRenderJson(document, message.entityName, { position: message.position });
+                
+                const edit = new vscode.WorkspaceEdit();
+                const endPos = new vscode.Position(document.lineCount, 0);
+                edit.insert(document.uri, endPos, newEntityText);
+                await vscode.workspace.applyEdit(edit);
+                await document.save();
+            }
+        }
+        if (message?.command === 'undo') {
+            await vscode.commands.executeCommand('undo');
+        }
     });
 
     context.subscriptions.push(currentPreviewPanel);
@@ -327,7 +380,7 @@ export async function togglePreviewMode(): Promise<void> {
     await refreshCurrentPreview();
 }
 
-// @state: green
+// @state: red
 async function updateEntityInDocument(document: vscode.TextDocument, originalName: string, updatedData: any): Promise<void> {
     const text = document.getText();
     const docs = parseFlowDocuments(text);
@@ -376,14 +429,22 @@ async function updateEntityInDocument(document: vscode.TextDocument, originalNam
     const headerKind = updatedData.kind || 'class';
     newBlockLines.push(`${accessPrefix}${headerKind} ${updatedData.name} {`);
 
-    if (bindPathLine) newBlockLines.push(bindPathLine);
-    if (autoImportLine) newBlockLines.push(autoImportLine);
+    if (headerKind === 'bind') {
+        if (updatedData.bindSourcePath !== undefined && updatedData.bindSourcePath !== null) {
+            newBlockLines.push(`    bind: "${updatedData.bindSourcePath}"`);
+        } else if (bindPathLine) {
+            newBlockLines.push(bindPathLine);
+        }
+    } else {
+        if (bindPathLine) newBlockLines.push(bindPathLine);
+        if (autoImportLine) newBlockLines.push(autoImportLine);
+    }
 
     if (headerKind === 'text') {
         if (updatedData.title) {
             newBlockLines.push(`    title: ${updatedData.title}`);
         }
-        if (updatedData.textBody) {
+        if (updatedData.textBody !== undefined && updatedData.textBody !== null) {
             updatedData.textBody.split(/\r?\n/).forEach((tl: string) => {
                 newBlockLines.push(`    ${tl}`);
             });
@@ -391,29 +452,77 @@ async function updateEntityInDocument(document: vscode.TextDocument, originalNam
     }
 
     // Always preserve fields and methods in the document block if they exist in the payload
-    if (updatedData.fields && updatedData.fields.length > 0) {
-        newBlockLines.push('    [Fields]');
-        updatedData.fields.forEach((f: any) => {
-            const fAccess = f.accessModifier ? f.accessModifier + ' ' : '';
-            const fType = f.type ? `: ${f.type}` : '';
-            newBlockLines.push(`    ${fAccess}${f.name}${fType}`);
-        });
+    if (headerKind !== 'interface' && headerKind !== 'text' && headerKind !== 'bind') {
+        if (updatedData.fields && updatedData.fields.length > 0) {
+            newBlockLines.push('    [Fields]');
+            updatedData.fields.forEach((f: any) => {
+                if (headerKind === 'enum') {
+                    newBlockLines.push(`    ${f.name}`);
+                } else {
+                    const fAccess = f.accessModifier ? f.accessModifier + ' ' : '';
+                    const fType = f.type ? `: ${f.type}` : '';
+                    newBlockLines.push(`    ${fAccess}${f.name}${fType}`);
+                }
+            });
+        }
     }
-    if (updatedData.methods && updatedData.methods.length > 0) {
-        newBlockLines.push('    [Methods]');
-        updatedData.methods.forEach((m: any) => {
-            const mAccess = m.accessModifier ? m.accessModifier + ' ' : '';
-            const modifiers = m.modifiers || [];
-            const staticStr = modifiers.includes('static') ? 'static ' : '';
-            const finalStr = modifiers.includes('final') ? 'final ' : '';
-            const returnTypeStr = m.returnType ? `: ${m.returnType}` : '';
-            newBlockLines.push(`    ${mAccess}${staticStr}${finalStr}${m.name}()${returnTypeStr}`);
-        });
+    if (headerKind !== 'text' && headerKind !== 'bind') {
+        if (updatedData.methods && updatedData.methods.length > 0) {
+            newBlockLines.push('    [Methods]');
+            updatedData.methods.forEach((m: any) => {
+                const mAccess = m.accessModifier ? m.accessModifier + ' ' : '';
+                const modifiers = m.modifiers || [];
+                const staticStr = modifiers.includes('static') ? 'static ' : '';
+                const finalStr = modifiers.includes('final') ? 'final ' : '';
+                const returnTypeStr = m.returnType ? `: ${m.returnType}` : '';
+                newBlockLines.push(`    ${mAccess}${staticStr}${finalStr}${m.name}()${returnTypeStr}`);
+            });
+        }
     }
 
-    if (relationLines.length > 0) {
+    // Rebuild relations dynamically if provided, otherwise preserve original
+    const hasUpdatedRelations = 
+        updatedData.extendsTargets !== undefined ||
+        updatedData.implementsTargets !== undefined ||
+        updatedData.inheritsTargets !== undefined ||
+        updatedData.associatesTargets !== undefined ||
+        updatedData.aggregatesTargets !== undefined ||
+        updatedData.composesTargets !== undefined ||
+        updatedData.dependsOnTargets !== undefined ||
+        updatedData.relationTargets !== undefined;
+
+    const finalRelationLines: string[] = [];
+    if (hasUpdatedRelations) {
+        const extendsList = updatedData.extendsTargets || [];
+        extendsList.forEach((t: string) => finalRelationLines.push(`    extends ${t}`));
+
+        const inheritsList = updatedData.inheritsTargets || [];
+        inheritsList.forEach((t: string) => finalRelationLines.push(`    inherits ${t}`));
+
+        const implementsList = updatedData.implementsTargets || [];
+        implementsList.forEach((t: string) => finalRelationLines.push(`    implements ${t}`));
+
+        const associatesList = updatedData.associatesTargets || [];
+        associatesList.forEach((t: string) => finalRelationLines.push(`    associates ${t}`));
+
+        const aggregatesList = updatedData.aggregatesTargets || [];
+        aggregatesList.forEach((t: string) => finalRelationLines.push(`    aggregates ${t}`));
+
+        const composesList = updatedData.composesTargets || [];
+        composesList.forEach((t: string) => finalRelationLines.push(`    composes ${t}`));
+
+        const dependsOnList = updatedData.dependsOnTargets || [];
+        dependsOnList.forEach((t: string) => finalRelationLines.push(`    dependsOn ${t}`));
+
+        const relationsList = updatedData.relationTargets || [];
+        relationsList.forEach((t: string) => finalRelationLines.push(`    -> ${t}`));
+    } else {
+        relationLines.forEach((rl: string) => finalRelationLines.push(rl));
+    }
+
+    if (finalRelationLines.length > 0) {
         newBlockLines.push('    [Relations]');
-        relationLines.forEach((rl: string) => newBlockLines.push(rl));
+        finalRelationLines.forEach((rl: string) => newBlockLines.push(rl));
     }
 
     if (commentLines.length > 0) {
@@ -665,7 +774,7 @@ async function updateMultipleConnectionsInRenderJson(
     }
 }
 
-// @state: green
+// @state: red
 function buildFlowTemplate(entityName: string, type: string): string {
     if (type === 'bind') {
         return `bind ${entityName}\n`;
@@ -674,6 +783,101 @@ function buildFlowTemplate(entityName: string, type: string): string {
         return `text ${entityName} {\n    title: ${entityName} core flow\n}\n`;
     }
     return `${type} ${entityName} {\n}\n`;
+}
+
+// @state: yellow
+async function deleteFromRenderJson(document: vscode.TextDocument, entityName: string): Promise<void> {
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+    if (!workspaceFolder) return;
+
+    const dirPath = path.join(workspaceFolder.uri.fsPath, '.planist', '.render');
+    const filePath = path.join(dirPath, '.render.json');
+
+    if (fs.existsSync(filePath)) {
+        try {
+            const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            if (data.entities && data.entities[entityName]) {
+                delete data.entities[entityName];
+                fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+            }
+        } catch (e) {
+            console.error('Failed to parse/write .render.json during deletion:', e);
+        }
+    }
+}
+
+// @state: yellow
+function buildFlowTemplateFromEntity(entityName: string, entityData: any): string {
+    const lines: string[] = [];
+    const kind = entityData.kind || 'class';
+    const accessStr = entityData.accessModifier ? `${entityData.accessModifier} ` : '';
+    
+    lines.push(`${accessStr}${kind} ${entityName} {`);
+    
+    if (kind === 'bind' && entityData.bindSourcePath) {
+        lines.push(`    bind: "${entityData.bindSourcePath}"`);
+    }
+    
+    if (kind === 'text' && entityData.textBody) {
+        entityData.textBody.split(/\r?\n/).forEach((l: string) => lines.push(`    ${l}`));
+    }
+    
+    if (kind !== 'interface' && kind !== 'text' && kind !== 'bind') {
+        if (entityData.fields && entityData.fields.length > 0) {
+            lines.push('    [Fields]');
+            entityData.fields.forEach((f: any) => {
+                if (kind === 'enum') {
+                    lines.push(`    ${f.name}`);
+                } else {
+                    const fAccess = f.accessModifier ? f.accessModifier + ' ' : '';
+                    const fType = f.type ? `: ${f.type}` : '';
+                    lines.push(`    ${fAccess}${f.name}${fType}`);
+                }
+            });
+        }
+    }
+    
+    if (kind !== 'text' && kind !== 'bind') {
+        if (entityData.methods && entityData.methods.length > 0) {
+            lines.push('    [Methods]');
+            entityData.methods.forEach((m: any) => {
+                const mAccess = m.accessModifier ? m.accessModifier + ' ' : '';
+                const modifiers = m.modifiers || [];
+                const staticStr = modifiers.includes('static') ? 'static ' : '';
+                const finalStr = modifiers.includes('final') ? 'final ' : '';
+                const returnTypeStr = m.returnType ? `: ${m.returnType}` : '';
+                lines.push(`    ${mAccess}${staticStr}${finalStr}${m.name}()${returnTypeStr}`);
+            });
+        }
+    }
+    
+    const relationKeys = [
+        { key: 'extendsTargets', prefix: 'extends' },
+        { key: 'inheritsTargets', prefix: 'inherits' },
+        { key: 'implementsTargets', prefix: 'implements' },
+        { key: 'associatesTargets', prefix: 'associates' },
+        { key: 'aggregatesTargets', prefix: 'aggregates' },
+        { key: 'composesTargets', prefix: 'composes' },
+        { key: 'dependsOnTargets', prefix: 'dependsOn' }
+    ];
+    
+    const relationsList: string[] = [];
+    relationKeys.forEach(rel => {
+        const targets = entityData[rel.key] || [];
+        targets.forEach((t: string) => relationsList.push(`    ${rel.prefix} ${t}`));
+    });
+    
+    if (entityData.relationTargets) {
+        entityData.relationTargets.forEach((t: string) => relationsList.push(`    -> ${t}`));
+    }
+    
+    if (relationsList.length > 0) {
+        lines.push('    [Relations]');
+        relationsList.forEach(r => lines.push(r));
+    }
+    
+    lines.push('}');
+    return lines.join('\n') + '\n';
 }
 
 

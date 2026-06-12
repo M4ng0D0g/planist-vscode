@@ -1,4 +1,4 @@
-// @state: green
+// @state: red
 export const NewFlowSchemaJS = `
 (function() {
     console.log('====== Planist New Infinite Board Core Activated ======');
@@ -29,6 +29,15 @@ export const NewFlowSchemaJS = `
     let contextMenuX = 0;
     let contextMenuY = 0;
 
+    // Advanced selection and clipboard variables
+    let selectedEntities = []; // Array of selected entity names
+    let clipboardEntities = []; // Array of copied entity data objects
+    let mouseX = 0; // Current cursor X in workspace coords
+    let mouseY = 0; // Current cursor Y in workspace coords
+    let isBoxSelecting = false;
+    let boxSelectStartX = 0;
+    let boxSelectStartY = 0;
+
     // DOM Elements
     let viewport = null;
     let workspace = null;
@@ -54,7 +63,7 @@ export const NewFlowSchemaJS = `
         return '';
     }
 
-    // @state: green
+    // @state: red
     function init() {
         viewport = document.getElementById('viewport');
         workspace = document.getElementById('workspace');
@@ -85,15 +94,6 @@ export const NewFlowSchemaJS = `
         });
         document.getElementById('fullscreen-btn')?.addEventListener('click', () => {
             vscode.postMessage({ command: 'toggleFullscreen' });
-        });
-
-        // Deselection listener on viewport background
-        viewport.addEventListener('mousedown', (e) => {
-            if (e.target === viewport || e.target === gridBg || e.target.id === 'workspace') {
-                document.querySelectorAll('.board-node').forEach(n => n.classList.remove('selected'));
-                selectedEntityName = null;
-                document.dispatchEvent(new CustomEvent('planist-node-deselected'));
-            }
         });
 
         // [修正註解] 透過監聽自訂 DOM 事件，讓 decoupled 的 Settings 面板能與後端通訊，
@@ -163,10 +163,101 @@ export const NewFlowSchemaJS = `
             }
         });
 
+        // Unified keybindings listener
         window.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
+            const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
+            if (isInput) return; // Skip if typing in inputs
+
+            const key = e.key.toLowerCase();
+            const isCtrl = e.ctrlKey || e.metaKey;
+
+            if (isCtrl && key === 'l') {
                 e.preventDefault();
                 triggerResetConnectionLayoutForSelected();
+            } else if (isCtrl && key === 'c') {
+                // Ctrl+C: Copy selected entities
+                e.preventDefault();
+                if (selectedEntities.length > 0) {
+                    clipboardEntities = selectedEntities.map(name => {
+                        const ent = activeEntities.find(entObj => entObj.name === name);
+                        return ent ? JSON.parse(JSON.stringify(ent)) : null;
+                    }).filter(Boolean);
+                }
+            } else if (isCtrl && key === 'x') {
+                // Ctrl+X: Cut selected entities
+                e.preventDefault();
+                if (selectedEntities.length > 0) {
+                    clipboardEntities = selectedEntities.map(name => {
+                        const ent = activeEntities.find(entObj => entObj.name === name);
+                        return ent ? JSON.parse(JSON.stringify(ent)) : null;
+                    }).filter(Boolean);
+                    selectedEntities.forEach(name => {
+                        vscode.postMessage({ command: 'deleteEntity', entityName: name });
+                    });
+                    selectedEntities = [];
+                    selectedEntityName = null;
+                    document.dispatchEvent(new CustomEvent('planist-node-deselected'));
+                }
+            } else if (isCtrl && key === 'v') {
+                // Ctrl+V: Paste copied entities near mouse pointer
+                e.preventDefault();
+                if (clipboardEntities.length > 0) {
+                    let sumX = 0, sumY = 0, count = 0;
+                    clipboardEntities.forEach(ent => {
+                        const pos = nodePositions[ent.name];
+                        if (pos) {
+                            sumX += pos.x;
+                            sumY += pos.y;
+                            count++;
+                        }
+                    });
+                    const midX = count > 0 ? sumX / count : mouseX;
+                    const midY = count > 0 ? sumY / count : mouseY;
+                    const dx = mouseX - midX;
+                    const dy = mouseY - midY;
+
+                    clipboardEntities.forEach(copied => {
+                        const pos = nodePositions[copied.name] || { x: mouseX, y: mouseY };
+                        const targetX = pos.x + dx;
+                        const targetY = pos.y + dy;
+
+                        let baseName = 'CopyOf' + copied.name;
+                        let counter = 1;
+                        let newName = baseName;
+                        while (activeEntities.some(ent => ent.name === newName)) {
+                            newName = baseName + '_' + counter;
+                            counter++;
+                        }
+
+                        vscode.postMessage({
+                            command: 'pasteEntity',
+                            entityName: newName,
+                            entityData: copied,
+                            position: { x: targetX, y: targetY }
+                        });
+                    });
+                }
+            } else if (isCtrl && key === 'a') {
+                // Ctrl+A: Select all entities
+                e.preventDefault();
+                selectedEntities = activeEntities.map(ent => ent.name);
+                workspace.querySelectorAll('.board-node').forEach(card => card.classList.add('selected'));
+                if (selectedEntities.length > 0) {
+                    selectedEntityName = selectedEntities[selectedEntities.length - 1];
+                    const lastSelectedEntity = activeEntities.find(ent => ent.name === selectedEntityName);
+                    if (lastSelectedEntity) {
+                        document.dispatchEvent(new CustomEvent('planist-node-selected', {
+                            detail: {
+                                entity: lastSelectedEntity,
+                                allEntities: activeEntities
+                            }
+                        }));
+                    }
+                }
+            } else if (isCtrl && key === 'z') {
+                // Ctrl+Z: Forward undo command to backend editor
+                e.preventDefault();
+                vscode.postMessage({ command: 'undo' });
             }
         });
 
@@ -242,34 +333,144 @@ export const NewFlowSchemaJS = `
 
     // @state: green
     function handleMouseDown(e) {
+        // Track global click to update coordinates
+        mouseX = (e.clientX - panX) / zoom;
+        mouseY = (e.clientY - panY) / zoom;
+
         // Prevent default only if clicking directly on viewport or grid background
         if (e.target === viewport || e.target === gridBg || e.target.id === 'workspace') {
-            isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            startPanX = panX;
-            startPanY = panY;
-            viewport.style.cursor = 'grabbing';
-            e.preventDefault();
+            if (e.ctrlKey || e.metaKey) {
+                // Start Range Box Selection
+                isBoxSelecting = true;
+                boxSelectStartX = (e.clientX - panX) / zoom;
+                boxSelectStartY = (e.clientY - panY) / zoom;
+                const box = document.getElementById('selection-box');
+                if (box) {
+                    box.style.left = e.clientX + 'px';
+                    box.style.top = e.clientY + 'px';
+                    box.style.width = '0px';
+                    box.style.height = '0px';
+                    box.style.display = 'block';
+                }
+                e.preventDefault();
+            } else {
+                // Click canvas background without Ctrl clears selection
+                document.querySelectorAll('.board-node').forEach(n => n.classList.remove('selected'));
+                selectedEntities = [];
+                selectedEntityName = null;
+                document.dispatchEvent(new CustomEvent('planist-node-deselected'));
+
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startPanX = panX;
+                startPanY = panY;
+                viewport.style.cursor = 'grabbing';
+                e.preventDefault();
+            }
         }
     }
 
-    // @state: green
+    // @state: red
     function handleMouseMove(e) {
-        if (!isDragging) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-        panX = startPanX + dx;
-        panY = startPanY + dy;
-        updateTransform();
+        mouseX = (e.clientX - panX) / zoom;
+        mouseY = (e.clientY - panY) / zoom;
+
+        if (isDragging) {
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            panX = startPanX + dx;
+            panY = startPanY + dy;
+            updateTransform();
+        } else if (isBoxSelecting) {
+            const curX = (e.clientX - panX) / zoom;
+            const curY = (e.clientY - panY) / zoom;
+
+            const x1 = Math.min(boxSelectStartX, curX);
+            const y1 = Math.min(boxSelectStartY, curY);
+            const x2 = Math.max(boxSelectStartX, curX);
+            const y2 = Math.max(boxSelectStartY, curY);
+
+            // Update range selection box coordinates
+            const clientX1 = x1 * zoom + panX;
+            const clientY1 = y1 * zoom + panY;
+            const clientW = (x2 - x1) * zoom;
+            const clientH = (y2 - y1) * zoom;
+
+            const box = document.getElementById('selection-box');
+            if (box) {
+                box.style.left = clientX1 + 'px';
+                box.style.top = clientY1 + 'px';
+                box.style.width = clientW + 'px';
+                box.style.height = clientH + 'px';
+            }
+
+            // Hit testing with board node cards
+            const cards = workspace.querySelectorAll('.board-node');
+            cards.forEach(card => {
+                const titleEl = card.querySelector('.node-title');
+                if (!titleEl) return;
+                const name = titleEl.textContent.trim();
+                const pos = nodePositions[name];
+                if (!pos) return;
+                const w = card.offsetWidth || 240;
+                const h = card.offsetHeight || 150;
+
+                const nodeX1 = pos.x;
+                const nodeY1 = pos.y;
+                const nodeX2 = pos.x + w;
+                const nodeY2 = pos.y + h;
+
+                const intersect = !(nodeX1 > x2 || nodeX2 < x1 || nodeY1 > y2 || nodeY2 < y1);
+                if (intersect) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+        }
     }
 
-    // @state: green
+    // @state: red
     function handleMouseUp(e) {
         if (isDragging) {
             isDragging = false;
             if (viewport) {
                 viewport.style.cursor = 'grab';
+            }
+        } else if (isBoxSelecting) {
+            isBoxSelecting = false;
+            const box = document.getElementById('selection-box');
+            if (box) {
+                box.style.display = 'none';
+            }
+
+            // Save box selection results
+            selectedEntities = [];
+            const cards = workspace.querySelectorAll('.board-node');
+            cards.forEach(card => {
+                if (card.classList.contains('selected')) {
+                    const titleEl = card.querySelector('.node-title');
+                    if (titleEl) {
+                        selectedEntities.push(titleEl.textContent.trim());
+                    }
+                }
+            });
+
+            if (selectedEntities.length > 0) {
+                selectedEntityName = selectedEntities[selectedEntities.length - 1];
+                const lastSelectedEntity = activeEntities.find(ent => ent.name === selectedEntityName);
+                if (lastSelectedEntity) {
+                    document.dispatchEvent(new CustomEvent('planist-node-selected', {
+                        detail: {
+                            entity: lastSelectedEntity,
+                            allEntities: activeEntities
+                        }
+                    }));
+                }
+            } else {
+                selectedEntityName = null;
+                document.dispatchEvent(new CustomEvent('planist-node-deselected'));
             }
         }
     }
@@ -915,9 +1116,9 @@ export const NewFlowSchemaJS = `
         }
     }
 
-    // @state: green
+    // @state: red
     function triggerResetConnectionLayoutForSelected() {
-        if (!selectedEntityName) return;
+        if (selectedEntities.length === 0) return;
         
         const nodes = [];
         const cardElements = workspace.querySelectorAll('.board-node');
@@ -967,7 +1168,7 @@ export const NewFlowSchemaJS = `
                 const targets = entity[rel.key] || [];
                 targets.forEach(targetName => {
                     if (nodePositions[targetName]) {
-                        if (entity.name === selectedEntityName || targetName === selectedEntityName) {
+                        if (selectedEntities.includes(entity.name) || selectedEntities.includes(targetName)) {
                             const fromNode = nodes.find(n => n.name === entity.name);
                             const toNode = nodes.find(n => n.name === targetName);
                             if (!fromNode || !toNode) return;
@@ -1208,12 +1409,35 @@ export const NewFlowSchemaJS = `
                             }
                         }));
                     } else if (e.button === 0) {
-                        document.querySelectorAll('.board-node').forEach(n => n.classList.remove('selected'));
-                        card.classList.add('selected');
-                        selectedEntityName = entity.name;
-                        document.dispatchEvent(new CustomEvent('planist-node-selected', {
-                            detail: { entity }
-                        }));
+                        if (e.ctrlKey || e.metaKey) {
+                            if (selectedEntities.includes(entity.name)) {
+                                selectedEntities = selectedEntities.filter(name => name !== entity.name);
+                                card.classList.remove('selected');
+                            } else {
+                                selectedEntities.push(entity.name);
+                                card.classList.add('selected');
+                            }
+                        } else {
+                            document.querySelectorAll('.board-node').forEach(n => n.classList.remove('selected'));
+                            selectedEntities = [entity.name];
+                            card.classList.add('selected');
+                        }
+
+                        if (selectedEntities.length > 0) {
+                            selectedEntityName = selectedEntities[selectedEntities.length - 1];
+                            const lastSelectedEntity = activeEntities.find(ent => ent.name === selectedEntityName);
+                            if (lastSelectedEntity) {
+                                document.dispatchEvent(new CustomEvent('planist-node-selected', {
+                                    detail: {
+                                        entity: lastSelectedEntity,
+                                        allEntities: activeEntities
+                                    }
+                                }));
+                            }
+                        } else {
+                            selectedEntityName = null;
+                            document.dispatchEvent(new CustomEvent('planist-node-deselected'));
+                        }
                     }
                 }
 
