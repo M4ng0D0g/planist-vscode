@@ -1,8 +1,9 @@
-// @state: green
+// @state: red
 export const NewFlowSchemaSettingsJS = `
 (function() {
     console.log('====== Planist Visualizer Node Settings Panel Core Activated ======');
     let selectedEntity = null;
+    let allEntitiesList = [];
     let recentColors = [];
     let selectedRecentColor = null;
 
@@ -10,8 +11,11 @@ export const NewFlowSchemaSettingsJS = `
     const settingsPanel = document.getElementById('settings-panel');
     const closeBtn = document.getElementById('close-settings-btn');
     const tabDef = document.getElementById('tab-definition');
+    const tabRelations = document.getElementById('tab-relations');
     const tabRender = document.getElementById('tab-rendering');
+    
     const contentDef = document.getElementById('settings-content-definition');
+    const contentRelations = document.getElementById('settings-content-relations');
     const contentRender = document.getElementById('settings-content-rendering');
 
     // HSL Sliders DOM
@@ -32,26 +36,35 @@ export const NewFlowSchemaSettingsJS = `
 
     // Tab switching logic
     tabDef.addEventListener('click', () => switchTab('definition'));
+    tabRelations.addEventListener('click', () => switchTab('relations'));
     tabRender.addEventListener('click', () => switchTab('rendering'));
 
     function switchTab(tab) {
-        if (tab === 'definition') {
-            tabDef.classList.add('active');
-            tabRender.classList.remove('active');
-            contentDef.style.display = 'flex';
-            contentRender.style.display = 'none';
-        } else {
-            tabDef.classList.remove('active');
-            tabRender.classList.add('active');
-            contentDef.style.display = 'none';
-            contentRender.style.display = 'flex';
-        }
+        const tabs = [
+            { id: 'definition', tabEl: tabDef, contentEl: contentDef },
+            { id: 'relations', tabEl: tabRelations, contentEl: contentRelations },
+            { id: 'rendering', tabEl: tabRender, contentEl: contentRender }
+        ];
+        
+        tabs.forEach(t => {
+            if (t.tabEl && t.contentEl) {
+                if (t.id === tab) {
+                    t.tabEl.classList.add('active');
+                    t.contentEl.style.display = 'flex';
+                } else {
+                    t.tabEl.classList.remove('active');
+                    t.contentEl.style.display = 'none';
+                }
+            }
+        });
     }
 
     // Listen to node selection custom events from board visualizer
     document.addEventListener('planist-node-selected', (e) => {
         selectedEntity = e.detail.entity;
+        allEntitiesList = e.detail.allEntities || [];
         populateSettings(selectedEntity);
+        populateRelations(selectedEntity);
         
         // Load color properties
         let h = 210, s = 80, l = 50;
@@ -121,18 +134,70 @@ export const NewFlowSchemaSettingsJS = `
         kindSelect.addEventListener('change', () => {
             entity.kind = kindSelect.value;
             triggerEntityUpdate(entity.name);
+            populateSettings(entity); // Re-populate based on new kind
         });
         kindGroup.appendChild(kindSelect);
         contentDef.appendChild(kindGroup);
 
-        // Fields list ("變數列表")
-        if (entity.fields && entity.fields.length > 0) {
+        const kind = entity.kind || 'class';
+
+        // Kind 1: text flow description -> Text Area
+        if (kind === 'text') {
+            const textGroup = createFormGroup('文字描述主體 (Text Body)');
+            const textTextarea = document.createElement('textarea');
+            textTextarea.className = 'settings-input';
+            textTextarea.style.minHeight = '150px';
+            textTextarea.style.fontFamily = 'monospace';
+            textTextarea.style.resize = 'vertical';
+            textTextarea.value = entity.textBody || '';
+            textTextarea.addEventListener('input', () => {
+                entity.textBody = textTextarea.value;
+                triggerEntityUpdate(entity.name);
+            });
+            textGroup.appendChild(textTextarea);
+            contentDef.appendChild(textGroup);
+            return;
+        }
+
+        // Kind 2: bind -> File Path Input
+        if (kind === 'bind') {
+            const bindGroup = createFormGroup('綁定檔案路徑 (Bind File Path)');
+            const bindInput = document.createElement('input');
+            bindInput.type = 'text';
+            bindInput.className = 'settings-input';
+            bindInput.placeholder = '例如: src/User.ts';
+            bindInput.value = entity.bindSourcePath || '';
+            bindInput.addEventListener('input', () => {
+                entity.bindSourcePath = bindInput.value;
+                triggerEntityUpdate(entity.name);
+            });
+            bindGroup.appendChild(bindInput);
+            contentDef.appendChild(bindGroup);
+            return;
+        }
+
+        // Kind 3: OO Entities & Enum -> Fields & Methods Editor
+        if (kind !== 'interface') {
             const fieldsHeader = document.createElement('div');
             fieldsHeader.className = 'list-section-header';
-            fieldsHeader.textContent = '變數列表 (Variables)';
+            fieldsHeader.innerHTML = '<span>變數列表 (Variables)</span>';
+            
+            const addFieldBtn = document.createElement('button');
+            addFieldBtn.className = 'add-btn';
+            addFieldBtn.style.marginTop = '0';
+            addFieldBtn.style.padding = '2px 8px';
+            addFieldBtn.textContent = '+ 新增';
+            addFieldBtn.addEventListener('click', () => {
+                if (!entity.fields) entity.fields = [];
+                entity.fields.push({ name: 'newField', type: kind === 'enum' ? '' : 'string' });
+                populateSettings(entity);
+                triggerEntityUpdate(entity.name);
+            });
+            fieldsHeader.appendChild(addFieldBtn);
             contentDef.appendChild(fieldsHeader);
 
-            entity.fields.forEach((f, idx) => {
+            const fieldsList = entity.fields || [];
+            fieldsList.forEach((f, idx) => {
                 const row = document.createElement('div');
                 row.className = 'list-item-row';
 
@@ -145,59 +210,223 @@ export const NewFlowSchemaSettingsJS = `
                     f.name = fNameInput.value;
                     triggerEntityUpdate(entity.name);
                 });
-
-                const fTypeInput = document.createElement('input');
-                fTypeInput.type = 'text';
-                fTypeInput.className = 'settings-input';
-                fTypeInput.placeholder = '類型';
-                fTypeInput.value = f.type || '';
-                fTypeInput.addEventListener('input', () => {
-                    f.type = fTypeInput.value;
-                    triggerEntityUpdate(entity.name);
-                });
-
                 row.appendChild(fNameInput);
-                row.appendChild(fTypeInput);
+
+                if (kind !== 'enum') {
+                    const fTypeInput = document.createElement('input');
+                    fTypeInput.type = 'text';
+                    fTypeInput.className = 'settings-input';
+                    fTypeInput.placeholder = '類型';
+                    fTypeInput.value = f.type || '';
+                    fTypeInput.addEventListener('input', () => {
+                        f.type = fTypeInput.value;
+                        triggerEntityUpdate(entity.name);
+                    });
+                    row.appendChild(fTypeInput);
+                }
+
+                // Delete Button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.innerHTML = '&times;';
+                deleteBtn.title = '刪除此變數';
+                deleteBtn.addEventListener('click', () => {
+                    entity.fields.splice(idx, 1);
+                    populateSettings(entity);
+                    triggerEntityUpdate(entity.name);
+                });
+                row.appendChild(deleteBtn);
+
                 contentDef.appendChild(row);
             });
         }
 
-        // Methods list ("方法列表")
-        if (entity.methods && entity.methods.length > 0) {
-            const methodsHeader = document.createElement('div');
-            methodsHeader.className = 'list-section-header';
-            methodsHeader.textContent = '方法列表 (Methods)';
-            contentDef.appendChild(methodsHeader);
+        // Methods list editor
+        const methodsHeader = document.createElement('div');
+        methodsHeader.className = 'list-section-header';
+        methodsHeader.innerHTML = '<span>方法列表 (Methods)</span>';
+        
+        const addMethodBtn = document.createElement('button');
+        addMethodBtn.className = 'add-btn';
+        addMethodBtn.style.marginTop = '0';
+        addMethodBtn.style.padding = '2px 8px';
+        addMethodBtn.textContent = '+ 新增';
+        addMethodBtn.addEventListener('click', () => {
+            if (!entity.methods) entity.methods = [];
+            entity.methods.push({ name: 'newMethod', returnType: 'void' });
+            populateSettings(entity);
+            triggerEntityUpdate(entity.name);
+        });
+        methodsHeader.appendChild(addMethodBtn);
+        contentDef.appendChild(methodsHeader);
 
-            entity.methods.forEach((m, idx) => {
-                const row = document.createElement('div');
-                row.className = 'list-item-row';
+        const methodsList = entity.methods || [];
+        methodsList.forEach((m, idx) => {
+            const row = document.createElement('div');
+            row.className = 'list-item-row';
 
-                const mNameInput = document.createElement('input');
-                mNameInput.type = 'text';
-                mNameInput.className = 'settings-input';
-                mNameInput.placeholder = '名稱';
-                mNameInput.value = m.name || '';
-                mNameInput.addEventListener('input', () => {
-                    m.name = mNameInput.value;
-                    triggerEntityUpdate(entity.name);
-                });
-
-                const mTypeInput = document.createElement('input');
-                mTypeInput.type = 'text';
-                mTypeInput.className = 'settings-input';
-                mTypeInput.placeholder = '傳回值';
-                mTypeInput.value = m.returnType || '';
-                mTypeInput.addEventListener('input', () => {
-                    m.returnType = mTypeInput.value;
-                    triggerEntityUpdate(entity.name);
-                });
-
-                row.appendChild(mNameInput);
-                row.appendChild(mTypeInput);
-                contentDef.appendChild(row);
+            const mNameInput = document.createElement('input');
+            mNameInput.type = 'text';
+            mNameInput.className = 'settings-input';
+            mNameInput.placeholder = '名稱';
+            mNameInput.value = m.name || '';
+            mNameInput.addEventListener('input', () => {
+                m.name = mNameInput.value;
+                triggerEntityUpdate(entity.name);
             });
+            row.appendChild(mNameInput);
+
+            const mTypeInput = document.createElement('input');
+            mTypeInput.type = 'text';
+            mTypeInput.className = 'settings-input';
+            mTypeInput.placeholder = '傳回值';
+            mTypeInput.value = m.returnType || '';
+            mTypeInput.addEventListener('input', () => {
+                m.returnType = mTypeInput.value;
+                triggerEntityUpdate(entity.name);
+            });
+            row.appendChild(mTypeInput);
+
+            // Delete Button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '&times;';
+            deleteBtn.title = '刪除此方法';
+            deleteBtn.addEventListener('click', () => {
+                entity.methods.splice(idx, 1);
+                populateSettings(entity);
+                triggerEntityUpdate(entity.name);
+            });
+            row.appendChild(deleteBtn);
+
+            contentDef.appendChild(row);
+        });
+    }
+
+    function populateRelations(entity) {
+        if (!entity) return;
+        contentRelations.innerHTML = '';
+
+        const relationsHeader = document.createElement('div');
+        relationsHeader.className = 'list-section-header';
+        relationsHeader.innerHTML = '<span>關聯清單 (Relations)</span>';
+        
+        const addRelationBtn = document.createElement('button');
+        addRelationBtn.className = 'add-btn';
+        addRelationBtn.style.marginTop = '0';
+        addRelationBtn.style.padding = '2px 8px';
+        addRelationBtn.textContent = '+ 新增關聯';
+        addRelationBtn.addEventListener('click', () => {
+            const targetCandidate = allEntitiesList.find(e => e.name !== entity.name);
+            if (!targetCandidate) {
+                alert('無其他實體可建立關聯！');
+                return;
+            }
+            if (!entity.associatesTargets) entity.associatesTargets = [];
+            entity.associatesTargets.push(targetCandidate.name);
+            populateRelations(entity);
+            triggerEntityUpdate(entity.name);
+        });
+        relationsHeader.appendChild(addRelationBtn);
+        contentRelations.appendChild(relationsHeader);
+
+        // Collect all outgoing relations
+        const relations = [];
+        const relationKeys = [
+            { key: 'extendsTargets', type: 'extends' },
+            { key: 'inheritsTargets', type: 'inherits' },
+            { key: 'implementsTargets', type: 'implements' },
+            { key: 'associatesTargets', type: 'associates' },
+            { key: 'aggregatesTargets', type: 'aggregates' },
+            { key: 'composesTargets', type: 'composes' },
+            { key: 'dependsOnTargets', type: 'dependsOn' }
+        ];
+
+        relationKeys.forEach(rel => {
+            const targets = entity[rel.key] || [];
+            targets.forEach((target, index) => {
+                relations.push({
+                    key: rel.key,
+                    type: rel.type,
+                    target: target,
+                    index: index
+                });
+            });
+        });
+
+        if (relations.length === 0) {
+            const emptyTip = document.createElement('div');
+            emptyTip.style.fontStyle = 'italic';
+            emptyTip.style.color = 'var(--vscode-sideBar-foreground, rgba(0,0,0,0.4))';
+            emptyTip.style.padding = '10px 0';
+            emptyTip.textContent = '目前無任何指出的關聯線。';
+            contentRelations.appendChild(emptyTip);
+            return;
         }
+
+        relations.forEach(rel => {
+            const row = document.createElement('div');
+            row.className = 'list-item-row';
+
+            // Relation Type Select
+            const typeSelect = document.createElement('select');
+            typeSelect.className = 'settings-select';
+            typeSelect.style.flex = '1';
+            relationKeys.forEach(rk => {
+                const opt = document.createElement('option');
+                opt.value = rk.type;
+                opt.textContent = rk.type;
+                if (rk.type === rel.type) opt.selected = true;
+                typeSelect.appendChild(opt);
+            });
+            typeSelect.addEventListener('change', () => {
+                const newType = typeSelect.value;
+                const newKey = relationKeys.find(rk => rk.type === newType).key;
+                
+                // Remove from old
+                entity[rel.key].splice(rel.index, 1);
+                
+                // Add to new
+                if (!entity[newKey]) entity[newKey] = [];
+                entity[newKey].push(rel.target);
+                
+                populateRelations(entity);
+                triggerEntityUpdate(entity.name);
+            });
+            row.appendChild(typeSelect);
+
+            // Target Node Select
+            const targetSelect = document.createElement('select');
+            targetSelect.className = 'settings-select';
+            targetSelect.style.flex = '1.2';
+            allEntitiesList.forEach(ent => {
+                if (ent.name === entity.name) return; // Cannot connect to self
+                const opt = document.createElement('option');
+                opt.value = ent.name;
+                opt.textContent = ent.name;
+                if (ent.name === rel.target) opt.selected = true;
+                targetSelect.appendChild(opt);
+            });
+            targetSelect.addEventListener('change', () => {
+                entity[rel.key][rel.index] = targetSelect.value;
+                triggerEntityUpdate(entity.name);
+            });
+            row.appendChild(targetSelect);
+
+            // Delete Button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '&times;';
+            deleteBtn.title = '刪除此關聯';
+            deleteBtn.addEventListener('click', () => {
+                entity[rel.key].splice(rel.index, 1);
+                populateRelations(entity);
+                triggerEntityUpdate(entity.name);
+            });
+            row.appendChild(deleteBtn);
+
+            contentRelations.appendChild(row);
+        });
     }
 
     function triggerEntityUpdate(originalName) {
@@ -210,7 +439,19 @@ export const NewFlowSchemaSettingsJS = `
                     kind: selectedEntity.kind,
                     fields: selectedEntity.fields,
                     methods: selectedEntity.methods,
-                    accessModifier: selectedEntity.accessModifier
+                    accessModifier: selectedEntity.accessModifier,
+                    bindSourcePath: selectedEntity.bindSourcePath,
+                    bindTargetEntity: selectedEntity.bindTargetEntity,
+                    textBody: selectedEntity.textBody,
+                    
+                    extendsTargets: selectedEntity.extendsTargets,
+                    implementsTargets: selectedEntity.implementsTargets,
+                    inheritsTargets: selectedEntity.inheritsTargets,
+                    associatesTargets: selectedEntity.associatesTargets,
+                    aggregatesTargets: selectedEntity.aggregatesTargets,
+                    composesTargets: selectedEntity.composesTargets,
+                    dependsOnTargets: selectedEntity.dependsOnTargets,
+                    relationTargets: selectedEntity.relationTargets
                 }
             }
         }));
@@ -225,12 +466,10 @@ export const NewFlowSchemaSettingsJS = `
         sliderS.value = s;
         sliderL.value = l;
 
-        // Update slider backgrounds dynamically to preview potential color shifts
         sliderS.style.background = 'linear-gradient(to right, hsl(' + h + ', 0%, ' + l + '%), hsl(' + h + ', 100%, ' + l + '%))';
         sliderL.style.background = 'linear-gradient(to right, hsl(' + h + ', ' + s + '%, 0%), hsl(' + h + ', ' + s + '%, 50%), hsl(' + h + ', ' + s + '%, 100%))';
     }
 
-    // Sliders Event Handlers
     function handleSliderInput() {
         if (!selectedEntity) return;
         const h = parseInt(sliderH.value, 10);
@@ -239,7 +478,6 @@ export const NewFlowSchemaSettingsJS = `
         
         updateSlidersUI(h, s, l);
 
-        // Update the board node visually in real-time
         const nodeCards = Array.from(document.querySelectorAll('.board-node'));
         const targetCard = nodeCards.find(card => {
             const titleEl = card.querySelector('.node-title');
@@ -257,7 +495,6 @@ export const NewFlowSchemaSettingsJS = `
         const l = parseInt(sliderL.value, 10);
         const color = 'hsl(' + h + ', ' + s + '%, ' + l + '%)';
 
-        // Save color permanently to file
         document.dispatchEvent(new CustomEvent('planist-update-entity-color', {
             detail: {
                 entityName: selectedEntity.name,
@@ -265,7 +502,6 @@ export const NewFlowSchemaSettingsJS = `
             }
         }));
 
-        // Add to recent colors list
         if (!recentColors.includes(color)) {
             recentColors.unshift(color);
             if (recentColors.length > 10) {
@@ -280,11 +516,9 @@ export const NewFlowSchemaSettingsJS = `
         slider.addEventListener('change', handleSliderChange);
     });
 
-    // Reset default color handler
     resetColorBtn.addEventListener('click', () => {
         if (!selectedEntity) return;
         
-        // Remove style override from board node
         const nodeCards = Array.from(document.querySelectorAll('.board-node'));
         const targetCard = nodeCards.find(card => {
             const titleEl = card.querySelector('.node-title');
@@ -294,7 +528,6 @@ export const NewFlowSchemaSettingsJS = `
             targetCard.style.backgroundColor = '';
         }
 
-        // Post message to clear from file
         document.dispatchEvent(new CustomEvent('planist-update-entity-color', {
             detail: {
                 entityName: selectedEntity.name,
@@ -303,7 +536,6 @@ export const NewFlowSchemaSettingsJS = `
         }));
     });
 
-    // Dynamically manage color context menu to keep markup modular
     let colorContextMenu = document.getElementById('color-context-menu');
     if (!colorContextMenu) {
         colorContextMenu = document.createElement('div');
@@ -346,18 +578,16 @@ export const NewFlowSchemaSettingsJS = `
         document.body.appendChild(colorContextMenu);
     }
 
-    // Global click listener to dismiss context menu
     document.addEventListener('click', () => {
         if (colorContextMenu) {
             colorContextMenu.style.display = 'none';
         }
     });
 
-    // Global keydown listener for Delete key color removal
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Delete' && selectedRecentColor) {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                return; // ignore if typing in inputs
+                return;
             }
             recentColors = recentColors.filter(c => c !== selectedRecentColor);
             selectedRecentColor = null;
@@ -375,7 +605,6 @@ export const NewFlowSchemaSettingsJS = `
             }
             circle.style.backgroundColor = color;
             
-            // Left click to select and apply color
             circle.addEventListener('click', (e) => {
                 e.stopPropagation();
                 selectedRecentColor = color;
@@ -408,7 +637,6 @@ export const NewFlowSchemaSettingsJS = `
                 }
             });
             
-            // Right click to select color and show context menu
             circle.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -425,7 +653,6 @@ export const NewFlowSchemaSettingsJS = `
         });
     }
 
-    // Initialize recent colors list
     renderRecentColors();
 })();
 `;
