@@ -20,7 +20,7 @@
 | `src\indexing\workspaceManager.ts` | 🟡 Yellow (未標記) | 119 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\flowPreviewPanel.ts` | 🟡 Yellow (內部含未穩定函式) | 160 | `綠: 1 | 黃: 0 | 紅: 1` |
 | `src\preview\graphDataProvider.ts` | 🟢 Green | 113 | `綠: 1 | 黃: 0 | 紅: 0` |
-| `src\preview\newFlowPreviewPanel.ts` | 🟢 Green | ⚠️ **571** | `綠: 15 | 黃: 0 | 紅: 0` |
+| `src\preview\newFlowPreviewPanel.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **747** | `綠: 13 | 黃: 2 | 紅: 2` |
 | `src\preview\schemaParser.ts` | 🟢 Green | ⚠️ **391** | `綠: 1 | 黃: 0 | 紅: 0` |
 | `src\preview\sync\SyncHub.ts` | 🟡 Yellow (未標記) | 47 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\components\PlanistBadge.ts` | 🟡 Yellow (未標記) | 13 | `綠: 0 | 黃: 0 | 紅: 0` |
@@ -32,15 +32,15 @@
 | `src\preview\ui\core\WebviewPage.ts` | 🟡 Yellow (未標記) | 44 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\schemas\ApiSchemaRenderer.ts` | 🟡 Yellow (未標記) | 155 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\schemas\DatabaseSchemaRenderer.ts` | 🟡 Yellow (未標記) | 170 | `綠: 0 | 黃: 0 | 紅: 0` |
-| `src\preview\ui\schemas\DesignSchemaRenderer.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **870** | `綠: 0 | 黃: 2 | 紅: 0` |
-| `src\preview\ui\schemas\DocsSchemaJS.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **468** | `綠: 10 | 黃: 0 | 紅: 2` |
-| `src\preview\ui\schemas\DocsSchemaRenderer.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **560** | `綠: 0 | 黃: 0 | 紅: 3` |
+| `src\preview\ui\schemas\DesignSchemaRenderer.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **1088** | `綠: 0 | 黃: 2 | 紅: 0` |
+| `src\preview\ui\schemas\DocsSchemaJS.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **707** | `綠: 5 | 黃: 0 | 紅: 9` |
+| `src\preview\ui\schemas\DocsSchemaRenderer.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **692** | `綠: 0 | 黃: 0 | 紅: 3` |
 | `src\preview\ui\schemas\FlowSchemaJS.ts` | 🟡 Yellow (未標記) | ⚠️ **392** | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\schemas\FlowSchemaRenderer.ts` | 🟡 Yellow (內部含未穩定函式) | 58 | `綠: 0 | 黃: 0 | 紅: 1` |
-| `src\preview\ui\schemas\NewFlowSchemaJS.ts` | 🟢 Green | ⚠️ **1098** | `綠: 20 | 黃: 0 | 紅: 0` |
-| `src\preview\ui\schemas\NewFlowSchemaRenderer.ts` | 🟢 Green | ⚠️ **464** | `綠: 4 | 黃: 0 | 紅: 0` |
-| `src\preview\ui\schemas\NewFlowSchemaSettingsCSS.ts` | 🟢 Green | ⚠️ **217** | `綠: 1 | 黃: 0 | 紅: 0` |
-| `src\preview\ui\schemas\NewFlowSchemaSettingsJS.ts` | 🟢 Green | ⚠️ **350** | `綠: 1 | 黃: 0 | 紅: 0` |
+| `src\preview\ui\schemas\NewFlowSchemaJS.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **1293** | `綠: 15 | 黃: 0 | 紅: 5` |
+| `src\preview\ui\schemas\NewFlowSchemaRenderer.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **486** | `綠: 1 | 黃: 0 | 紅: 3` |
+| `src\preview\ui\schemas\NewFlowSchemaSettingsCSS.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **250** | `綠: 0 | 黃: 0 | 紅: 1` |
+| `src\preview\ui\schemas\NewFlowSchemaSettingsJS.ts` | 🟡 Yellow (內部含未穩定函式) | ⚠️ **557** | `綠: 0 | 黃: 0 | 紅: 1` |
 | `src\preview\ui\schemas\RendererFactory.ts` | 🟢 Green | 31 | `綠: 1 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\schemas\SchemaRenderer.ts` | 🟡 Yellow (未標記) | 5 | `綠: 0 | 黃: 0 | 紅: 0` |
 | `src\preview\ui\schemas\StateSchemaRenderer.ts` | 🟡 Yellow (未標記) | 184 | `綠: 0 | 黃: 0 | 紅: 0` |
